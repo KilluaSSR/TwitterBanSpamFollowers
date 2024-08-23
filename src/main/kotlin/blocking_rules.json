@@ -1,0 +1,11 @@
+{
+  "blockNoProfilePicture": true,
+  "blockRegistered": false,
+  "registrationMonths": 2,
+  "usernameKeywords": ["spam", "bot", "fake"],
+  "descriptionKeywords": ["promotion", "advertisement"],
+  "minFollowers": 10,
+  "maxFriends": 100,
+  "friendsToFollowersRatioEnabled": true,
+  "friendsToFollowersRatioThreshold": 20.0
+}

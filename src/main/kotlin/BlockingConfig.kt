@@ -3,7 +3,6 @@ package killua.dev
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import twitter4j.v1.User
-import twitter4j.v1.UsersResources
 import java.io.FileReader
 import java.time.LocalDateTime
 
@@ -18,68 +17,10 @@ data class BlockingConfig(
     val friendsToFollowersRatioEnabled: Boolean,
     val friendsToFollowersRatioThreshold: Double
 )
+
 data class BlockCheckResult(val shouldBlock: Boolean, val matchingKeywords: List<String>)
 
-private fun monthAgo(months: Int?): LocalDateTime {
-    val monthsToSubtract = months ?: 3 // Default to 3 months if not specified
-    return LocalDateTime.now().minusMonths(monthsToSubtract.toLong())
-}
 
-fun shouldBlock(user: User): BlockCheckResult {
-    val matchingKeywords = mutableListOf<String>()
-
-    if (checkKeywords(user.screenName, blockingConfig.usernameKeywords, matchingKeywords)) {
-        return BlockCheckResult(true, matchingKeywords)
-    }
-
-    if (checkKeywords(user.description, blockingConfig.descriptionKeywords, matchingKeywords)) {
-        return BlockCheckResult(true, matchingKeywords)
-    }
-
-    if (checkSpamCriteria(user)) {
-        return BlockCheckResult(true, listOf("Spam criteria"))
-    }
-
-    return BlockCheckResult(false, emptyList())
-}
-
-private fun checkKeywords(text: String, keywords: List<String>, matchingKeywords: MutableList<String>): Boolean {
-    return keywords.any { keyword ->
-        text.contains(keyword, ignoreCase = true).also { if (it) matchingKeywords.add(keyword) }
-    }
-}
-
-private fun checkSpamCriteria(user: User): Boolean {
-    return spam(user, blockingConfig)
-}
-
-fun spam(user: User, config: BlockingConfig): Boolean {
-    val isProfileImageDefault = user.profileImageURL.contains("default_profile_images")
-    val isCreatedBefore = config.blockRegistered && user.createdAt.isBefore(monthAgo(config.registrationMonths))
-    val hasFewFollowers = user.followersCount < config.minFollowers
-    val hasManyFriends = user.friendsCount > config.maxFriends
-    val friendsToFollowersRatioHigh = config.friendsToFollowersRatioEnabled &&
-            user.followersCount > 0 &&
-            user.friendsCount / user.followersCount > config.friendsToFollowersRatioThreshold
-
-    return (isProfileImageDefault || isCreatedBefore) &&
-            (hasFewFollowers || hasManyFriends || friendsToFollowersRatioHigh)
-}
-
-fun blockUser(id: Long, user: UsersResources, dryRun:Boolean) {
-    print("$id: blocking…")
-    if (!dryRun) {
-        try {
-            user.createBlock(id)
-            println(" Success! User $id has been blocked.")
-        } catch (e: Throwable) {
-            println(" Error: Failed to block user $id. Manual intervention may be needed.")
-            throw e
-        }
-    } else {
-        println("dry run")
-    }
-}
 
 fun loadBlockingConfig() {
     if (configFile.exists()) {

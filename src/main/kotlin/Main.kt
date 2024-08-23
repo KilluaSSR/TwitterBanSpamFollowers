@@ -2,7 +2,6 @@ package killua.dev
 
 import com.github.ajalt.clikt.core.NoOpCliktCommand
 import com.github.ajalt.clikt.core.subcommands
-import java.io.File
 import java.io.InputStream
 import java.util.*
 
@@ -15,7 +14,7 @@ fun main(vararg args: String) {
     initialize("sensitive_word_dict.txt")
     NoOpCliktCommand(name = "<FileName.jar>")
         .apply {
-            subcommands(AuthCommand(), RunCommand())
+            subcommands(AuthCommand(), RunCommand(),Execute())
         }
         .main(args)
 }
@@ -30,14 +29,19 @@ fun initialize(keywordsFileName: String) {
 }
 
 private fun loadKeywords(fileName: String): Set<String> {
-    val inputStream: InputStream? = object {}.javaClass.classLoader.getResourceAsStream(fileName)
+    val inputStream: InputStream = object {}.javaClass.classLoader.getResourceAsStream(fileName)
         ?: throw IllegalArgumentException("Resource not found: $fileName")
-    return inputStream?.bufferedReader().use { it?.readLines()?.toSet()!! }
+    return inputStream.bufferedReader().use {
+        it.readLines()
+            .map { line -> line.trim() }
+            .filter { line -> line.isNotEmpty() }
+            .toSet()
+    }
 }
 
-fun isKeywordPresent(text: String): Boolean {
+fun isKeywordPresent(text: String): List<String> {
     if (!::internalKeywords.isInitialized) {
         throw IllegalStateException("Keywords have not been initialized")
     }
-    return internalKeywords.any { text.contains(it, ignoreCase = true) }
+    return internalKeywords.filter { text.contains(it, ignoreCase = true) }
 }
