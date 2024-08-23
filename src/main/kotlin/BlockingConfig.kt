@@ -25,38 +25,45 @@ private fun monthAgo(months: Int?): LocalDateTime {
     return LocalDateTime.now().minusMonths(monthsToSubtract.toLong())
 }
 
+fun shouldBlock(user: User): BlockCheckResult {
+    val matchingKeywords = mutableListOf<String>()
+
+    if (checkKeywords(user.screenName, blockingConfig.usernameKeywords, matchingKeywords)) {
+        return BlockCheckResult(true, matchingKeywords)
+    }
+
+    if (checkKeywords(user.description, blockingConfig.descriptionKeywords, matchingKeywords)) {
+        return BlockCheckResult(true, matchingKeywords)
+    }
+
+    if (checkSpamCriteria(user)) {
+        return BlockCheckResult(true, listOf("Spam criteria"))
+    }
+
+    return BlockCheckResult(false, emptyList())
+}
+
+private fun checkKeywords(text: String, keywords: List<String>, matchingKeywords: MutableList<String>): Boolean {
+    return keywords.any { keyword ->
+        text.contains(keyword, ignoreCase = true).also { if (it) matchingKeywords.add(keyword) }
+    }
+}
+
+private fun checkSpamCriteria(user: User): Boolean {
+    return spam(user, blockingConfig)
+}
+
 fun spam(user: User, config: BlockingConfig): Boolean {
     val isProfileImageDefault = user.profileImageURL.contains("default_profile_images")
     val isCreatedBefore = config.blockRegistered && user.createdAt.isBefore(monthAgo(config.registrationMonths))
     val hasFewFollowers = user.followersCount < config.minFollowers
     val hasManyFriends = user.friendsCount > config.maxFriends
-    val friendsToFollowersRatioHigh = config.friendsToFollowersRatioEnabled && user.followersCount > 0 && user.friendsCount / user.followersCount > config.friendsToFollowersRatioThreshold
+    val friendsToFollowersRatioHigh = config.friendsToFollowersRatioEnabled &&
+            user.followersCount > 0 &&
+            user.friendsCount / user.followersCount > config.friendsToFollowersRatioThreshold
 
-    return (isProfileImageDefault && isCreatedBefore && (hasFewFollowers && hasManyFriends || friendsToFollowersRatioHigh))
-}
-
-fun shouldBlock(user: User): BlockCheckResult {
-    val matchingKeywords = mutableListOf<String>()
-
-    if (blockingConfig.usernameKeywords.any { keyword ->
-            user.screenName.contains(keyword, ignoreCase = true) ||
-                    isKeywordPresent(user.screenName).also { if (it) matchingKeywords.add(keyword) }
-        }) {
-        return BlockCheckResult(true, matchingKeywords)
-    }
-
-    if (blockingConfig.descriptionKeywords.any { keyword ->
-            user.description.contains(keyword, ignoreCase = true) ||
-                    isKeywordPresent(user.description).also { if (it) matchingKeywords.add(keyword) }
-        }) {
-        return BlockCheckResult(true, matchingKeywords)
-    }
-
-    if (spam(user, blockingConfig)) {
-        return BlockCheckResult(true, listOf("Spam criteria"))
-    }
-
-    return BlockCheckResult(false, emptyList())
+    return (isProfileImageDefault || isCreatedBefore) &&
+            (hasFewFollowers || hasManyFriends || friendsToFollowersRatioHigh)
 }
 
 fun blockUser(id: Long, user: UsersResources, dryRun:Boolean) {

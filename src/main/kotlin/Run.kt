@@ -86,19 +86,15 @@ class RunCommand : CliktCommand(
                 for (id in cachedIds) {
                         try {
                             val user = users.showUser(id)
-                            println("ID:${user.screenName}, Username:${user.name}, $id: does not match criteria.")
-                            if (shouldBlock(user).let { result ->
-                                    if (result.shouldBlock) {
-                                        val keywords = result.matchingKeywords.joinToString(", ")
-                                        println("ID:${user.screenName}, Username:${user.name}, $id: ${RED_TEXT}matches criteria: $keywords${RESET_TEXT}")
-                                        usersToBlock[user.id] = arrayOf(user.name, user.screenName)
-                                        saveUsersToBlock(user.id, user.name, user.screenName)
-                                    } else {
-                                        println("ID:${user.screenName}, Username:${user.name}, $id: does not match criteria.")
-                                    }
-                                    result.shouldBlock
-                                })
-                            idsToRemove.add(id)
+                            val result = shouldBlock(user)
+                            if (result.shouldBlock) {
+                                val keywords = result.matchingKeywords.joinToString(", ")
+                                println("ID:${user.screenName}, Username:${user.name}, $id: ${RED_TEXT}matches criteria: $keywords${RESET_TEXT}")
+                                usersToBlock[user.id] = arrayOf(user.name, user.screenName)
+                                saveUsersToBlock(user.id, user.name, user.screenName)
+                            } else {
+                                println("ID:${user.screenName}, Username:${user.name}, $id: does not match criteria.")
+                            }
                         } catch (e: SSLHandshakeException) {
                             println("SSL Handshake failed, retrying in 5 seconds...")
                             delay(5000)
