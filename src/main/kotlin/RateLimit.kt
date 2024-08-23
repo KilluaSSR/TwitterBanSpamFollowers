@@ -1,4 +1,4 @@
-package killua.dev.com.killuadev.twitterbanspamfollowers
+package killua.dev
 
 import twitter4j.v1.RateLimitStatus
 data class RateLimit(
