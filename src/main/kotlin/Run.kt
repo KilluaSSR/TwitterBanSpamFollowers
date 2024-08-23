@@ -8,6 +8,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import twitter4j.TwitterException
 import twitter4j.v1.RateLimitStatus
+import twitter4j.v1.User
 import javax.net.ssl.SSLHandshakeException
 
 var rateLimitStatus: RateLimitStatus = RateLimit.Unlimited
@@ -15,7 +16,7 @@ lateinit var blockingConfig: BlockingConfig
 // ANSI escape code for red text
 const val RED_TEXT = "\u001B[31m"
 const val RESET_TEXT = "\u001B[0m"
-
+const val MAX_RETRY = 5
 class RunCommand : CliktCommand(
     name = "run",
     help = "Block them now!",
@@ -68,10 +69,37 @@ class RunCommand : CliktCommand(
                 rateLimitStatus.sleepIfNeeded(callCount = 2)
                 val cachedIds = loadIdsFromFile().toMutableSet()
                 val idsToRemove = mutableListOf<Long>()
-                try {
+                var retryCount = 0
+
+                while (retryCount < MAX_RETRY) {
+                    var success = true // 标记此次循环是否成功
                     for (id in cachedIds) {
+                        var user: User? = null
                         try {
-                            val user = users.showUser(id)
+                            user = users.showUser(id)
+                        } catch (e: SSLHandshakeException) {
+                            println("SSL Handshake failed, retrying in 5 seconds...")
+                            delay(5000)
+                            retryCount++
+                            success = false
+                            break
+                        } catch (e: TwitterException) {
+                            handleTwitterException(e)
+                            retryCount++
+                            success = false
+                            break
+                        } catch (e: Exception) {
+                            println("Unexpected error occurred, retrying in 10 seconds...")
+                            delay(10000)
+                            retryCount++
+                            success = false
+                            break
+                        } finally {
+                            cachedIds.removeAll(idsToRemove.toSet())
+                            refreshFileWithCachedIds(idsFile, cachedIds)
+                        }
+
+                        if (user != null) {
                             val result = shouldBlock(user)
                             if (result.shouldBlock) {
                                 val keywords = result.matchingKeywords.joinToString(", ")
@@ -81,20 +109,18 @@ class RunCommand : CliktCommand(
                             } else {
                                 println("ID:${user.screenName}, Username:${user.name}, $id: does not match criteria.")
                             }
-                        } catch (e: SSLHandshakeException) {
-                            println("SSL Handshake failed, retrying in 5 seconds...")
-                            delay(5000)
-                        } catch (e: TwitterException) {
-                            handleTwitterException(e)
-                            continue
-                        } catch (e: Exception) {
-                            delay(10000)
                         }
                     }
-                } finally {
-                    cachedIds.removeAll(idsToRemove.toSet())
-                    refreshFileWithCachedIds(idsFile, cachedIds)
+
+                    if (success) {
+                        break
+                    }
                 }
+
+                if (retryCount >= MAX_RETRY) {
+                    throw Exception("Maximum retry limit reached.")
+                }
+
             }
         } catch (e: Exception) {
             println("Error during execution: ${e.message}")
@@ -105,9 +131,9 @@ class RunCommand : CliktCommand(
             println("\nUsers to be blocked:")
             usersToBlock.forEach { (id, details) ->
                 val (screenName, name) = details
-                println("Username: $name")
+                println("Username: $screenName")
                 println("User ID: $id")
-                println("Profile URL: https://twitter.com/$screenName\n")
+                println("Profile URL: https://twitter.com/$name\n")
             }
             blocker(usersToBlock,users, dryRun)
         } else {
@@ -118,7 +144,4 @@ class RunCommand : CliktCommand(
             println("THIS IS A DRY RUN")
         }
     }
-
-
-
 }

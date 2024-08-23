@@ -8,7 +8,8 @@ import java.time.LocalDateTime
 
 data class BlockingConfig(
     val blockNoProfilePicture: Boolean,
-    val blockRegistered: Boolean,
+    val blockRegisteredShortly: Boolean,
+    val noFansButTooManyFollowingsWithDefaultProfilePicture: Int,
     val registrationMonths: Int?,
     val usernameKeywords: List<String>,
     val descriptionKeywords: List<String>,
@@ -33,7 +34,8 @@ fun loadBlockingConfig() {
         // Set default values if config file does not exist
         blockingConfig = BlockingConfig(
             blockNoProfilePicture = false,
-            blockRegistered = false,
+            blockRegisteredShortly = false,
+            noFansButTooManyFollowingsWithDefaultProfilePicture = 30,
             registrationMonths = null, // No limit
             usernameKeywords = emptyList(),
             descriptionKeywords = emptyList(),

@@ -1,7 +1,8 @@
 {
   "blockNoProfilePicture": true,
-  "blockRegistered": false,
+  "blockRegisteredShortly": false,
   "registrationMonths": 2,
+  "noFansButTooManyFollowingsWithDefaultProfilePicture": 30,
   "usernameKeywords": ["spam", "bot", "fake"],
   "descriptionKeywords": ["promotion", "advertisement"],
   "minFollowers": 10,

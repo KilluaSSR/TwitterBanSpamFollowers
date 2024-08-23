@@ -8,7 +8,6 @@ import java.io.IOException
 import java.time.LocalDateTime
 import javax.net.ssl.SSLHandshakeException
 
-
 fun monthAgo(months: Int?): LocalDateTime {
     val monthsToSubtract = months ?: 3 // Default to 3 months if not specified
     return LocalDateTime.now().minusMonths(monthsToSubtract.toLong())
@@ -65,9 +64,9 @@ fun spam(user: User, config: BlockingConfig): BlockCheckResult {
         matchingKeywords.add("Default profile image")
     }
 
-    val isCreatedBefore = config.blockRegistered && user.createdAt.isAfter(monthAgo(config.registrationMonths))
+    val isCreatedBefore = config.blockRegisteredShortly && user.createdAt.isAfter(monthAgo(config.registrationMonths))
     if (isCreatedBefore) {
-        matchingKeywords.add("Account created within ${monthAgo(config.registrationMonths)} months")
+        matchingKeywords.add("Account created within ${config.registrationMonths} months")
     }
 
     val hasFewFollowers = user.followersCount < config.minFollowers
@@ -80,6 +79,16 @@ fun spam(user: User, config: BlockingConfig): BlockCheckResult {
         matchingKeywords.add("Many friends")
     }
 
+    val noFansButTooManyFollowing = user.followersCount == 0 && user.friendsCount > config.noFansButTooManyFollowingsWithDefaultProfilePicture && isProfileImageDefault
+    if (noFansButTooManyFollowing) {
+        matchingKeywords.add("0 Fans but too many following with default profile image")
+    }
+
+    val noFansButTooManyFollowingAndRegisteredCurrently = config.blockRegisteredShortly && noFansButTooManyFollowing
+    if (noFansButTooManyFollowingAndRegisteredCurrently) {
+        matchingKeywords.add("0 Fans but too many following with default profile image, registered within ${config.registrationMonths} months")
+    }
+
     val friendsToFollowersRatioHigh = config.friendsToFollowersRatioEnabled &&
             user.followersCount > 0 &&
             user.friendsCount / user.followersCount > config.friendsToFollowersRatioThreshold
@@ -87,8 +96,8 @@ fun spam(user: User, config: BlockingConfig): BlockCheckResult {
         matchingKeywords.add("High friends-to-followers ratio")
     }
 
-    val shouldBlock = (isProfileImageDefault || isCreatedBefore) &&
-            (hasFewFollowers || hasManyFriends || friendsToFollowersRatioHigh)
+    val shouldBlock = noFansButTooManyFollowingAndRegisteredCurrently || noFansButTooManyFollowing || (isProfileImageDefault && isCreatedBefore) &&
+            (hasFewFollowers && hasManyFriends || friendsToFollowersRatioHigh)
 
     return BlockCheckResult(shouldBlock, matchingKeywords)
 }
@@ -98,6 +107,18 @@ suspend fun blocker(
     users: UsersResources,
     dryRun: Boolean,
 ){
+    if (usersToBlock.isNotEmpty()) {
+        println("Users to block:")
+        usersToBlock.forEach { (id, details) ->
+            val (screenName, name) = details
+            val profileUrl = "https://twitter.com/$name"
+            println("ID: $id, Screen Name: $screenName, ID: $name, Profile URL: $profileUrl ")
+        }
+    } else {
+        println("Nothing to block.")
+        return
+    }
+
     if (!dryRun && getConfirmation("Enter 'ok' to block these users or any other key to cancel: ")) {
         println("Blocking users...")
         processUserBlocking(
@@ -144,7 +165,6 @@ suspend fun processUserBlocking(
         }else{
             println(id)
         }
-
     }
     if(!dryRun){
         idsToRemove.forEach { id ->
