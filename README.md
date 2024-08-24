@@ -58,9 +58,9 @@ sudo pacman -S jdk21-openjdk
 
 要查看运行命令的所有可用选项，请使用：
 
-    ```bash
+   ```bash
     java -jar app.jar run --help
-    ```
+   ```
 
 这将显示可用的用法和选项，您可以将它们组合使用。
 
