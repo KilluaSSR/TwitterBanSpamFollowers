@@ -12,10 +12,12 @@ import javax.net.ssl.SSLHandshakeException
 
 var rateLimitStatus: RateLimitStatus = RateLimit.Unlimited
 lateinit var blockingConfig: BlockingConfig
+
 // ANSI escape code for red text
 const val RED_TEXT = "\u001B[31m"
 const val RESET_TEXT = "\u001B[0m"
 const val MAX_RETRY = 5
+
 class RunCommand : CliktCommand(
     name = "run",
     help = "Block them now!",
@@ -63,7 +65,8 @@ class RunCommand : CliktCommand(
         supervisorScope {
             try {
                 val (token, secret) = if (accessToken == null || accessSecret == null) {
-                    readCredentialsFromFile() ?: throw IllegalArgumentException("No valid credentials found. Run auth first.")
+                    readCredentialsFromFile()
+                        ?: throw IllegalArgumentException("No valid credentials found. Run auth first.")
                 } else {
                     accessToken to accessSecret
                 }
@@ -117,7 +120,15 @@ class RunCommand : CliktCommand(
                         val cachedIds = loadIdsFromFile().toMutableSet()
 
                         val idsToRemove = mutableListOf<Long>()
-                        processCachedIds(cachedIds, idsToRemove, users, registerConverted, spamConverted, ratioConverted, usersToBlock)
+                        processCachedIds(
+                            cachedIds,
+                            idsToRemove,
+                            users,
+                            registerConverted,
+                            spamConverted,
+                            ratioConverted,
+                            usersToBlock
+                        )
                         cachedIds.removeAll(idsToRemove.toSet())
                         refreshFileWithCachedIds(idsFile, cachedIds)
                     }
@@ -193,7 +204,16 @@ class RunCommand : CliktCommand(
                     users.showUser(id)
                 } ?: continue
                 delay(80)
-                val result = shouldBlock(user, picture, registerConverted, spamConverted, locked, includeSite, includeLocation, ratioConverted)
+                val result = shouldBlock(
+                    user,
+                    picture,
+                    registerConverted,
+                    spamConverted,
+                    locked,
+                    includeSite,
+                    includeLocation,
+                    ratioConverted
+                )
                 if (result.shouldBlock) {
                     val keywords = result.matchingKeywords.joinToString(", ")
                     println("ID:${user.screenName}, Username:${user.name}, $id: ${RED_TEXT}matches criteria: $keywords${RESET_TEXT}")
@@ -206,7 +226,7 @@ class RunCommand : CliktCommand(
             } catch (e: TwitterException) {
                 handleTwitterException(e)
                 continue
-            } catch (e:Exception){
+            } catch (e: Exception) {
                 delay(10000)
             }
         }

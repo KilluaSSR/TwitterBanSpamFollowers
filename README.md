@@ -99,8 +99,7 @@ sudo pacman -S jdk21-openjdk
 java -jar app.jar execute
 ```
 
-## <span style="color:red">特别提示：您有义务在执行最终Block前进行手动的检查，确认每一位用户是否真的需要被Block，而不是
-*仅* 靠程序代工。由于您的疏忽导致的任何后果与作者无关。</span>
+## <span style="color:red">特别提示：您有义务在执行最终Block前进行手动的检查，确认每一位用户是否真的需要被Block，而不是仅靠程序代工。由于您的疏忽导致的任何后果与作者无关。</span>
 
 ## ⚙️ 配置
 

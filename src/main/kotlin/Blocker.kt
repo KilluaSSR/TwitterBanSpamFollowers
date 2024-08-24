@@ -14,7 +14,16 @@ fun monthAgo(months: Int?): LocalDateTime {
     return LocalDateTime.now().minusMonths(monthsToSubtract.toLong())
 }
 
-fun shouldBlock(user: User, picture: Boolean, registerConverted: Int?, spamConverted: Int?, locked: Boolean, includeSite: Boolean, includeLocation: Boolean, ratioConverted: Double?): BlockCheckResult {
+fun shouldBlock(
+    user: User,
+    picture: Boolean,
+    registerConverted: Int?,
+    spamConverted: Int?,
+    locked: Boolean,
+    includeSite: Boolean,
+    includeLocation: Boolean,
+    ratioConverted: Double?
+): BlockCheckResult {
     val matchingKeywords = mutableListOf<String>()
 
     // 检查用户名是否包含任何配置的黑名单关键词
@@ -23,7 +32,13 @@ fun shouldBlock(user: User, picture: Boolean, registerConverted: Int?, spamConve
         // 检查用户名是否包含任何配置的白名单关键词
         val excludeMatches = checkKeywords(user.screenName, blockingConfig.excludeKeywords, matchingKeywords)
         if (excludeMatches.isNotEmpty()) {
-            return BlockCheckResult(false, usernameMatches.map { "Matched blacklist keyword: $it, but also matched whitelist keyword: ${excludeMatches.joinToString(", ")}. Not blocking." })
+            return BlockCheckResult(
+                false,
+                usernameMatches.map {
+                    "Matched blacklist keyword: $it, but also matched whitelist keyword: ${
+                        excludeMatches.joinToString(", ")
+                    }. Not blocking."
+                })
         }
         return BlockCheckResult(true, usernameMatches.map { "Username keyword match: $it" })
     }
@@ -34,7 +49,13 @@ fun shouldBlock(user: User, picture: Boolean, registerConverted: Int?, spamConve
         // 检查描述是否包含任何配置的白名单关键词
         val excludeMatches = checkKeywords(user.description, blockingConfig.excludeKeywords, matchingKeywords)
         if (excludeMatches.isNotEmpty()) {
-            return BlockCheckResult(false, descriptionMatches.map { "Matched blacklist keyword: $it, but also matched whitelist keyword: ${excludeMatches.joinToString(", ")}. Not blocking." })
+            return BlockCheckResult(
+                false,
+                descriptionMatches.map {
+                    "Matched blacklist keyword: $it, but also matched whitelist keyword: ${
+                        excludeMatches.joinToString(", ")
+                    }. Not blocking."
+                })
         }
         return BlockCheckResult(true, descriptionMatches.map { "Description keyword match: $it" })
     }
@@ -46,7 +67,13 @@ fun shouldBlock(user: User, picture: Boolean, registerConverted: Int?, spamConve
             // 检查位置是否包含任何配置的白名单关键词
             val excludeMatches = checkKeywords(user.location, blockingConfig.excludeKeywords, matchingKeywords)
             if (excludeMatches.isNotEmpty()) {
-                return BlockCheckResult(false, locationMatches.map { "Matched blacklist keyword: $it, but also matched whitelist keyword: ${excludeMatches.joinToString(", ")}. Not blocking." })
+                return BlockCheckResult(
+                    false,
+                    locationMatches.map {
+                        "Matched blacklist keyword: $it, but also matched whitelist keyword: ${
+                            excludeMatches.joinToString(", ")
+                        }. Not blocking."
+                    })
             }
             return BlockCheckResult(true, locationMatches.map { "Location keyword match: $it" })
         }
@@ -59,7 +86,13 @@ fun shouldBlock(user: User, picture: Boolean, registerConverted: Int?, spamConve
             // 检查网址是否包含任何配置的白名单关键词
             val excludeMatches = checkKeywords(user.url, blockingConfig.excludeKeywords, matchingKeywords)
             if (excludeMatches.isNotEmpty()) {
-                return BlockCheckResult(false, urlMatches.map { "Matched blacklist keyword: $it, but also matched whitelist keyword: ${excludeMatches.joinToString(", ")}. Not blocking." })
+                return BlockCheckResult(
+                    false,
+                    urlMatches.map {
+                        "Matched blacklist keyword: $it, but also matched whitelist keyword: ${
+                            excludeMatches.joinToString(", ")
+                        }. Not blocking."
+                    })
             }
             return BlockCheckResult(true, urlMatches.map { "URL keyword match: $it" })
         }
@@ -83,11 +116,25 @@ private fun checkKeywords(
     }
 }
 
-private fun checkSpamCriteria(user: User,picture:Boolean,registerConverted: Int?,spamConverted: Int?,locked:Boolean,ratioConverted: Double?): BlockCheckResult {
-    return spam(user,picture,registerConverted,spamConverted,locked,ratioConverted)
+private fun checkSpamCriteria(
+    user: User,
+    picture: Boolean,
+    registerConverted: Int?,
+    spamConverted: Int?,
+    locked: Boolean,
+    ratioConverted: Double?
+): BlockCheckResult {
+    return spam(user, picture, registerConverted, spamConverted, locked, ratioConverted)
 }
 
-fun spam(user: User, picture: Boolean, registerConverted: Int?, spamConverted: Int?, locked: Boolean, ratioConverted: Double?): BlockCheckResult {
+fun spam(
+    user: User,
+    picture: Boolean,
+    registerConverted: Int?,
+    spamConverted: Int?,
+    locked: Boolean,
+    ratioConverted: Double?
+): BlockCheckResult {
     val matchingKeywords = mutableListOf<String>()
     var shouldBlock = true
 
@@ -122,7 +169,8 @@ fun spam(user: User, picture: Boolean, registerConverted: Int?, spamConverted: I
         }
 
         if (spamConverted != null && picture) {
-            val noFansButTooManyFollowing = user.followersCount == 0 && user.friendsCount > spamConverted && user.profileImageURL.contains("default_profile_images")
+            val noFansButTooManyFollowing =
+                user.followersCount == 0 && user.friendsCount > spamConverted && user.profileImageURL.contains("default_profile_images")
             if (noFansButTooManyFollowing) {
                 matchingKeywords.add("0 Fans but too many following with default profile image")
             } else {
@@ -131,7 +179,8 @@ fun spam(user: User, picture: Boolean, registerConverted: Int?, spamConverted: I
         }
 
         if (ratioConverted != null) {
-            val friendsToFollowersRatioHigh = user.followersCount > 0 && user.friendsCount / user.followersCount > ratioConverted
+            val friendsToFollowersRatioHigh =
+                user.followersCount > 0 && user.friendsCount / user.followersCount > ratioConverted
             if (friendsToFollowersRatioHigh) {
                 matchingKeywords.add("High friends-to-followers ratio")
             } else {
@@ -147,7 +196,7 @@ suspend fun blocker(
     usersToBlock: MutableMap<Long, Array<String>>,
     users: UsersResources,
     dryRun: Boolean,
-){
+) {
     if (usersToBlock.isNotEmpty()) {
         println("Users to block:")
         usersToBlock.forEach { (id, details) ->
@@ -188,7 +237,7 @@ suspend fun processUserBlocking(
 
     while (iterator.hasNext()) {
         val id = iterator.next()
-        if(!dryRun){
+        if (!dryRun) {
             try {
                 delay(500)
                 users.createBlock(id)
@@ -201,14 +250,14 @@ suspend fun processUserBlocking(
                 delay(5000)
             } catch (e: TwitterException) {
                 handleRateLimitStatus(e)
-            }  catch (e: Exception) {
+            } catch (e: Exception) {
                 println("Error blocking user $id: ${e.message}")
             }
-        }else{
+        } else {
             println(id)
         }
     }
-    if(!dryRun){
+    if (!dryRun) {
         idsToRemove.forEach { id ->
             usersToBlock.remove(id)
         }
