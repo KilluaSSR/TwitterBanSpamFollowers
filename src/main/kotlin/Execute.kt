@@ -17,7 +17,7 @@ class Execute : CliktCommand(
 
     override fun run() = runBlocking {
         val usersToBlock = loadUserIdsToBlock().toMutableMap()
-        if(usersToBlock.isEmpty()) throw Exception("Nothing to block. ")
+        if (usersToBlock.isEmpty()) throw Exception("Nothing to block. ")
         val (token, secret) = if (accessToken == null || accessSecret == null) {
             readCredentialsFromFile() ?: throw IllegalArgumentException("No valid credentials found. Run auth first.")
         } else {
@@ -29,7 +29,7 @@ class Execute : CliktCommand(
         val twitterV1 = twitter.v1()
         val users = twitterV1.users()
 
-        blocker(usersToBlock,users,dryRun)
+        blocker(usersToBlock, users, dryRun)
 
     }
 }

@@ -54,6 +54,12 @@ class RunCommand : CliktCommand(
         .flag()
         .help("Also scan the user's location string")
 
+    private val delay by option(metavar = "INT")
+        .help(
+            "Delay between fetching two users must be specified in milliseconds. A high delay can significantly extend the processing time, " +
+                "but it will make the process more stable. Note that 1 second equals 1000 milliseconds. " +
+                "The default value is 100 milliseconds, and it must be greater than 80 milliseconds."
+        )
     private val ratio by option(metavar = "INT")
         .help("Block users with a followings-to-followers ratio higher than the specified value")
 
@@ -86,6 +92,17 @@ class RunCommand : CliktCommand(
                     throw Exception("You need to input a number.")
                 }
 
+                val delayConverted = delay?.toLongOrNull()
+                if (delay?.isNotEmpty() == true && delayConverted == null) {
+                    throw Exception("You need to input a number.")
+                }
+                if (delayConverted != null && delayConverted < 80) {
+                    throw Exception("Delay must be grater than 80.")
+                }
+
+                val delayTime = delayConverted ?: 100
+
+
                 launch(exceptionHandler) {
                     val twitter = initializeTwitterClient(token, secret) ?: return@launch
                     val twitterV1 = twitter.v1()
@@ -112,9 +129,9 @@ class RunCommand : CliktCommand(
                         rateLimitStatus = ids.rateLimitStatus ?: RateLimit.Unlimited
                         println("Done. (count=${ids.iDs.size}, hasMore=${cursor != 0L})\n")
 
-                        if (!idsFile.exists() || idsFile.length().toInt() == 0) {
-                            saveIdsToFile(ids.iDs.toList())
-                        }
+
+                        saveIdsToFile(ids.iDs.toList())
+
 
                         rateLimitStatus.sleepIfNeeded(callCount = 2)
                         val cachedIds = loadIdsFromFile().toMutableSet()
@@ -127,13 +144,17 @@ class RunCommand : CliktCommand(
                             registerConverted,
                             spamConverted,
                             ratioConverted,
-                            usersToBlock
+                            usersToBlock,
+                            delayTime
                         )
                         cachedIds.removeAll(idsToRemove.toSet())
                         refreshFileWithCachedIds(idsFile, cachedIds)
                     }
 
                     if (usersToBlock.isNotEmpty()) {
+                        if (cursor != 0L) {
+                            println("Warning: The previous steps did not complete successfully. Proceeding to block users... Wait 10 seconds.")
+                        }
                         println("\nUsers to be blocked:")
                         usersToBlock.forEach { (id, details) ->
                             val (screenName, name) = details
@@ -141,6 +162,10 @@ class RunCommand : CliktCommand(
                             println("User ID: $id")
                             println("Profile URL: https://twitter.com/$name\n")
                         }
+                        if (cursor != 0L) {
+                            println("Wait 10 seconds.")
+                        }
+                        delay(10000)
                         blocker(usersToBlock, users, dryRun)
                     } else {
                         println("No users match the criteria for blocking.")
@@ -165,7 +190,7 @@ class RunCommand : CliktCommand(
 
     // Retry logic for Twitter API calls
     private suspend fun <T> withRetry(
-        maxRetries: Int = 3,
+        maxRetries: Int = 10, // 设置最大重试次数为 10
         initialDelay: Long = 1000L,
         factor: Double = 2.0,
         block: suspend () -> T
@@ -186,7 +211,7 @@ class RunCommand : CliktCommand(
                 delay(10000)
             }
         }
-        return null
+        return null // 在重试次数用完后返回 null
     }
 
     private suspend fun processCachedIds(
@@ -196,14 +221,15 @@ class RunCommand : CliktCommand(
         registerConverted: Int?,
         spamConverted: Int?,
         ratioConverted: Double?,
-        usersToBlock: MutableMap<Long, Array<String>>
+        usersToBlock: MutableMap<Long, Array<String>>,
+        delayTime: Long
     ) {
         for (id in cachedIds) {
             try {
                 val user = withRetry {
                     users.showUser(id)
-                } ?: continue
-                delay(80)
+                } ?: continue // 如果重试后仍然失败，继续处理下一个ID
+                delay(delayTime)
                 val result = shouldBlock(
                     user,
                     picture,
@@ -223,12 +249,14 @@ class RunCommand : CliktCommand(
                 } else {
                     println("ID:${user.screenName}, Username:${user.name}, $id: does not match criteria.")
                 }
-            } catch (e: TwitterException) {
-                handleTwitterException(e)
-                continue
             } catch (e: Exception) {
+                // 如果遇到错误，不退出，继续处理下一个ID
                 delay(10000)
+                continue
             }
         }
+
+        cachedIds.removeAll(idsToRemove.toSet())
+        refreshFileWithCachedIds(idsFile, cachedIds)
     }
 }
