@@ -1,5 +1,6 @@
 package killua.dev
 
+import com.fasterxml.jackson.annotation.JsonInclude.Include
 import kotlinx.coroutines.delay
 import twitter4j.TwitterException
 import twitter4j.v1.User
@@ -13,28 +14,58 @@ fun monthAgo(months: Int?): LocalDateTime {
     return LocalDateTime.now().minusMonths(monthsToSubtract.toLong())
 }
 
-fun shouldBlock(user: User): BlockCheckResult {
+fun shouldBlock(user: User, picture: Boolean, registerConverted: Int?, spamConverted: Int?, locked: Boolean, includeSite: Boolean, includeLocation: Boolean, ratioConverted: Double?): BlockCheckResult {
     val matchingKeywords = mutableListOf<String>()
 
-    // Check if internal keywords are present in username
-    val internalMatches = isKeywordPresent(user.screenName)
-    if (internalMatches.isNotEmpty()) {
-        return BlockCheckResult(true, internalMatches.map { "Internal keyword match: $it" })
-    }
-
-    // Check if username contains any of the configured keywords
-    val usernameMatches = checkKeywords(user.screenName, blockingConfig.usernameKeywords, matchingKeywords)
+    // 检查用户名是否包含任何配置的黑名单关键词
+    val usernameMatches = checkKeywords(user.screenName, blockingConfig.userKeywords, matchingKeywords)
     if (usernameMatches.isNotEmpty()) {
+        // 检查用户名是否包含任何配置的白名单关键词
+        val excludeMatches = checkKeywords(user.screenName, blockingConfig.excludeKeywords, matchingKeywords)
+        if (excludeMatches.isNotEmpty()) {
+            return BlockCheckResult(false, usernameMatches.map { "Matched blacklist keyword: $it, but also matched whitelist keyword: ${excludeMatches.joinToString(", ")}. Not blocking." })
+        }
         return BlockCheckResult(true, usernameMatches.map { "Username keyword match: $it" })
     }
 
-    // Check if description contains any of the configured keywords
-    val descriptionMatches = checkKeywords(user.description, blockingConfig.descriptionKeywords, matchingKeywords)
+    // 检查描述是否包含任何配置的黑名单关键词
+    val descriptionMatches = checkKeywords(user.description, blockingConfig.userKeywords, matchingKeywords)
     if (descriptionMatches.isNotEmpty()) {
+        // 检查描述是否包含任何配置的白名单关键词
+        val excludeMatches = checkKeywords(user.description, blockingConfig.excludeKeywords, matchingKeywords)
+        if (excludeMatches.isNotEmpty()) {
+            return BlockCheckResult(false, descriptionMatches.map { "Matched blacklist keyword: $it, but also matched whitelist keyword: ${excludeMatches.joinToString(", ")}. Not blocking." })
+        }
         return BlockCheckResult(true, descriptionMatches.map { "Description keyword match: $it" })
     }
 
-    val spamResult = checkSpamCriteria(user)
+    if (includeLocation) {
+        // 检查位置是否包含任何配置的黑名单关键词
+        val locationMatches = checkKeywords(user.location, blockingConfig.userKeywords, matchingKeywords)
+        if (locationMatches.isNotEmpty()) {
+            // 检查位置是否包含任何配置的白名单关键词
+            val excludeMatches = checkKeywords(user.location, blockingConfig.excludeKeywords, matchingKeywords)
+            if (excludeMatches.isNotEmpty()) {
+                return BlockCheckResult(false, locationMatches.map { "Matched blacklist keyword: $it, but also matched whitelist keyword: ${excludeMatches.joinToString(", ")}. Not blocking." })
+            }
+            return BlockCheckResult(true, locationMatches.map { "Location keyword match: $it" })
+        }
+    }
+
+    if (includeSite) {
+        // 检查网址是否包含任何配置的黑名单关键词
+        val urlMatches = checkKeywords(user.url, blockingConfig.userKeywords, matchingKeywords)
+        if (urlMatches.isNotEmpty()) {
+            // 检查网址是否包含任何配置的白名单关键词
+            val excludeMatches = checkKeywords(user.url, blockingConfig.excludeKeywords, matchingKeywords)
+            if (excludeMatches.isNotEmpty()) {
+                return BlockCheckResult(false, urlMatches.map { "Matched blacklist keyword: $it, but also matched whitelist keyword: ${excludeMatches.joinToString(", ")}. Not blocking." })
+            }
+            return BlockCheckResult(true, urlMatches.map { "URL keyword match: $it" })
+        }
+    }
+
+    val spamResult = checkSpamCriteria(user, picture, registerConverted, spamConverted, locked, ratioConverted)
     if (spamResult.shouldBlock) {
         return BlockCheckResult(true, spamResult.matchingKeywords)
     }
@@ -52,52 +83,62 @@ private fun checkKeywords(
     }
 }
 
-private fun checkSpamCriteria(user: User): BlockCheckResult {
-    return spam(user, blockingConfig)
+private fun checkSpamCriteria(user: User,picture:Boolean,registerConverted: Int?,spamConverted: Int?,locked:Boolean,ratioConverted: Double?): BlockCheckResult {
+    return spam(user,picture,registerConverted,spamConverted,locked,ratioConverted)
 }
 
-fun spam(user: User, config: BlockingConfig): BlockCheckResult {
+fun spam(user: User, picture: Boolean, registerConverted: Int?, spamConverted: Int?, locked: Boolean, ratioConverted: Double?): BlockCheckResult {
     val matchingKeywords = mutableListOf<String>()
+    var shouldBlock = true
 
-    val isProfileImageDefault = user.profileImageURL.contains("default_profile_images")
-    if (isProfileImageDefault) {
-        matchingKeywords.add("Default profile image")
+    if (!picture && registerConverted == null && spamConverted == null && !locked && ratioConverted == null) {
+        shouldBlock = false
+    } else {
+        if (picture) {
+            val isProfileImageDefault = user.profileImageURL.contains("default_profile_images")
+            if (isProfileImageDefault) {
+                matchingKeywords.add("Default profile image")
+            } else {
+                shouldBlock = false
+            }
+        }
+
+        if (registerConverted != null) {
+            val isCreatedBefore = user.createdAt.isAfter(monthAgo(registerConverted))
+            if (isCreatedBefore) {
+                matchingKeywords.add("Account created within $registerConverted months")
+            } else {
+                shouldBlock = false
+            }
+        }
+
+        if (locked) {
+            val isLocked = user.isProtected
+            if (isLocked) {
+                matchingKeywords.add("Account is protected")
+            } else {
+                shouldBlock = false
+            }
+        }
+
+        if (spamConverted != null && picture) {
+            val noFansButTooManyFollowing = user.followersCount == 0 && user.friendsCount > spamConverted && user.profileImageURL.contains("default_profile_images")
+            if (noFansButTooManyFollowing) {
+                matchingKeywords.add("0 Fans but too many following with default profile image")
+            } else {
+                shouldBlock = false
+            }
+        }
+
+        if (ratioConverted != null) {
+            val friendsToFollowersRatioHigh = user.followersCount > 0 && user.friendsCount / user.followersCount > ratioConverted
+            if (friendsToFollowersRatioHigh) {
+                matchingKeywords.add("High friends-to-followers ratio")
+            } else {
+                shouldBlock = false
+            }
+        }
     }
-
-    val isCreatedBefore = config.blockRegisteredShortly && user.createdAt.isAfter(monthAgo(config.registrationMonths))
-    if (isCreatedBefore) {
-        matchingKeywords.add("Account created within ${config.registrationMonths} months")
-    }
-
-    val hasFewFollowers = user.followersCount < config.minFollowers
-    if (hasFewFollowers) {
-        matchingKeywords.add("Few followers")
-    }
-
-    val hasManyFriends = user.friendsCount > config.maxFriends
-    if (hasManyFriends) {
-        matchingKeywords.add("Many friends")
-    }
-
-    val noFansButTooManyFollowing = user.followersCount == 0 && user.friendsCount > config.noFansButTooManyFollowingsWithDefaultProfilePicture && isProfileImageDefault
-    if (noFansButTooManyFollowing) {
-        matchingKeywords.add("0 Fans but too many following with default profile image")
-    }
-
-    val noFansButTooManyFollowingAndRegisteredCurrently = config.blockRegisteredShortly && noFansButTooManyFollowing
-    if (noFansButTooManyFollowingAndRegisteredCurrently) {
-        matchingKeywords.add("0 Fans but too many following with default profile image, registered within ${config.registrationMonths} months")
-    }
-
-    val friendsToFollowersRatioHigh = config.friendsToFollowersRatioEnabled &&
-            user.followersCount > 0 &&
-            user.friendsCount / user.followersCount > config.friendsToFollowersRatioThreshold
-    if (friendsToFollowersRatioHigh) {
-        matchingKeywords.add("High friends-to-followers ratio")
-    }
-
-    val shouldBlock = noFansButTooManyFollowingAndRegisteredCurrently || noFansButTooManyFollowing || (isProfileImageDefault && isCreatedBefore) &&
-            (hasFewFollowers && hasManyFriends || friendsToFollowersRatioHigh)
 
     return BlockCheckResult(shouldBlock, matchingKeywords)
 }
@@ -114,6 +155,7 @@ suspend fun blocker(
             val profileUrl = "https://twitter.com/$name"
             println("ID: $id, Screen Name: $screenName, ID: $name, Profile URL: $profileUrl ")
         }
+        println("${RED_TEXT} You should manually review each user pending block to prevent mistakes. ${RESET_TEXT}")
     } else {
         println("Nothing to block.")
         return
