@@ -4,12 +4,10 @@ import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.help
 import com.github.ajalt.clikt.parameters.options.option
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.supervisorScope
+import kotlinx.coroutines.*
 import twitter4j.TwitterException
 import twitter4j.v1.RateLimitStatus
-import twitter4j.v1.User
+import twitter4j.v1.UsersResources
 import javax.net.ssl.SSLHandshakeException
 
 var rateLimitStatus: RateLimitStatus = RateLimit.Unlimited
@@ -57,7 +55,11 @@ class RunCommand : CliktCommand(
     private val ratio by option(metavar = "INT")
         .help("Block users with a followings-to-followers ratio higher than the specified value")
 
-    override fun run() = runBlocking {
+    override fun run(): Unit = runBlocking {
+        val exceptionHandler = CoroutineExceptionHandler { _, exception ->
+            println("Caught $exception")
+        }
+
         supervisorScope {
             try {
                 val (token, secret) = if (accessToken == null || accessSecret == null) {
@@ -81,110 +83,62 @@ class RunCommand : CliktCommand(
                     throw Exception("You need to input a number.")
                 }
 
-                val twitter = initializeTwitterClient(token, secret) ?: return@supervisorScope
+                launch(exceptionHandler) {
+                    val twitter = initializeTwitterClient(token, secret) ?: return@launch
+                    val twitterV1 = twitter.v1()
+                    val users = twitterV1.users()
+                    val friendsFollowers = twitterV1.friendsFollowers()
 
-                val twitterV1 = twitter.v1()
-                val users = twitterV1.users()
-                val friendsFollowers = twitterV1.friendsFollowers()
+                    if (dryRun) {
+                        println("DRY RUN\n")
+                    }
 
-                if (dryRun) {
-                    println("DRY RUN\n")
-                }
+                    var cursor = -1L
+                    val usersToBlock = loadUserIdsToBlock().toMutableMap()
+                    loadBlockingConfig()
 
-                var cursor = -1L
-                val usersToBlock = loadUserIdsToBlock().toMutableMap()
-                loadBlockingConfig()
-
-                try {
                     while (cursor != 0L) {
                         rateLimitStatus.sleepIfNeeded()
                         print("Fetching followers")
-                        val ids = try {
+
+                        val ids = withRetry {
                             friendsFollowers.getFollowersIDs(cursor)
-                        } catch (e: TwitterException) {
-                            handleTwitterException(e)
-                            rateLimitStatus = e.rateLimitStatus ?: RateLimit.FiveMinutes
-                            continue
-                        }
+                        } ?: break // Exit loop if failed after retries
+
                         cursor = ids.nextCursor
                         rateLimitStatus = ids.rateLimitStatus ?: RateLimit.Unlimited
                         println("Done. (count=${ids.iDs.size}, hasMore=${cursor != 0L})\n")
+
                         if (!idsFile.exists() || idsFile.length().toInt() == 0) {
                             saveIdsToFile(ids.iDs.toList())
                         }
+
                         rateLimitStatus.sleepIfNeeded(callCount = 2)
                         val cachedIds = loadIdsFromFile().toMutableSet()
+
                         val idsToRemove = mutableListOf<Long>()
-                        var retryCount = 0
-
-                        while (retryCount < MAX_RETRY) {
-                            var success = true // 标记此次循环是否成功
-                            for (id in cachedIds) {
-                                var user: User? = null
-                                try {
-                                    user = users.showUser(id)
-                                    delay(80)
-                                } catch (e: TwitterException) {
-                                    handleTwitterException(e)
-                                    retryCount++
-                                    success = false
-                                    break
-                                } catch (e: SSLHandshakeException) {
-                                    println("SSL Handshake failed, retrying in 5 seconds...")
-                                    delay(5000)
-                                    retryCount++
-                                    success = false
-                                    break
-                                } catch (e: Exception) {
-                                    println("Unexpected error occurred, retrying in 10 seconds...")
-                                    delay(10000)
-                                    retryCount++
-                                    success = false
-                                    break
-                                } finally {
-                                    cachedIds.removeAll(idsToRemove.toSet())
-                                    refreshFileWithCachedIds(idsFile, cachedIds)
-                                }
-
-                                if (user != null) {
-                                    val result = shouldBlock(user, picture, registerConverted, spamConverted, locked, includeSite, includeLocation, ratioConverted)
-                                    if (result.shouldBlock) {
-                                        val keywords = result.matchingKeywords.joinToString(", ")
-                                        println("ID:${user.screenName}, Username:${user.name}, $id: ${RED_TEXT}matches criteria: $keywords${RESET_TEXT}")
-                                        usersToBlock[user.id] = arrayOf(user.name, user.screenName)
-                                        saveUsersToBlock(user.id, user.name, user.screenName)
-                                    } else {
-                                        println("ID:${user.screenName}, Username:${user.name}, $id: does not match criteria.")
-                                    }
-                                }
-                            }
-                            if (success) {
-                                break
-                            }
-                        }
-                        if (retryCount >= MAX_RETRY) {
-                            throw Exception("Maximum retry limit reached.")
-                        }
+                        processCachedIds(cachedIds, idsToRemove, users, registerConverted, spamConverted, ratioConverted, usersToBlock)
+                        cachedIds.removeAll(idsToRemove.toSet())
+                        refreshFileWithCachedIds(idsFile, cachedIds)
                     }
-                } catch (e: Exception) {
-                    println("Error during execution: ${e.message}")
-                    throw e
-                }
-                if (usersToBlock.isNotEmpty()) {
-                    println("\nUsers to be blocked:")
-                    usersToBlock.forEach { (id, details) ->
-                        val (screenName, name) = details
-                        println("Username: $screenName")
-                        println("User ID: $id")
-                        println("Profile URL: https://twitter.com/$name\n")
+
+                    if (usersToBlock.isNotEmpty()) {
+                        println("\nUsers to be blocked:")
+                        usersToBlock.forEach { (id, details) ->
+                            val (screenName, name) = details
+                            println("Username: $screenName")
+                            println("User ID: $id")
+                            println("Profile URL: https://twitter.com/$name\n")
+                        }
+                        blocker(usersToBlock, users, dryRun)
+                    } else {
+                        println("No users match the criteria for blocking.")
                     }
-                    blocker(usersToBlock, users, dryRun)
-                } else {
-                    println("No users match the criteria for blocking.")
-                }
-                println("\nAll done!")
-                if (dryRun) {
-                    println("THIS IS A DRY RUN")
+
+                    println("\nAll done!")
+                    if (dryRun) {
+                        println("THIS IS A DRY RUN")
+                    }
                 }
             } catch (e: TwitterException) {
                 handleTwitterException(e)
@@ -193,6 +147,66 @@ class RunCommand : CliktCommand(
                 delay(5000)
             } catch (e: Exception) {
                 println("Unexpected error occurred, retrying in 10 seconds...")
+                delay(10000)
+            }
+        }
+    }
+
+    // Retry logic for Twitter API calls
+    private suspend fun <T> withRetry(
+        maxRetries: Int = 3,
+        initialDelay: Long = 1000L,
+        factor: Double = 2.0,
+        block: suspend () -> T
+    ): T? {
+        var currentDelay = initialDelay
+        repeat(maxRetries) {
+            try {
+                return block()
+            } catch (e: TwitterException) {
+                handleTwitterException(e)
+                delay(currentDelay)
+                currentDelay = (currentDelay * factor).toLong()
+            } catch (e: SSLHandshakeException) {
+                println("SSL Handshake failed, retrying in 5 seconds...")
+                delay(5000)
+            } catch (e: Exception) {
+                println("Unexpected error occurred, retrying in 10 seconds...")
+                delay(10000)
+            }
+        }
+        return null
+    }
+
+    private suspend fun processCachedIds(
+        cachedIds: MutableSet<Long>,
+        idsToRemove: MutableList<Long>,
+        users: UsersResources,
+        registerConverted: Int?,
+        spamConverted: Int?,
+        ratioConverted: Double?,
+        usersToBlock: MutableMap<Long, Array<String>>
+    ) {
+        for (id in cachedIds) {
+            try {
+                val user = withRetry {
+                    users.showUser(id)
+                } ?: continue
+                delay(80)
+                val result = shouldBlock(user, picture, registerConverted, spamConverted, locked, includeSite, includeLocation, ratioConverted)
+                if (result.shouldBlock) {
+                    val keywords = result.matchingKeywords.joinToString(", ")
+                    println("ID:${user.screenName}, Username:${user.name}, $id: ${RED_TEXT}matches criteria: $keywords${RESET_TEXT}")
+                    usersToBlock[user.id] = arrayOf(user.name, user.screenName)
+                    idsToRemove.add(id)
+                    saveUsersToBlock(user.id, user.name, user.screenName)
+                } else {
+                    println("ID:${user.screenName}, Username:${user.name}, $id: does not match criteria.")
+                }
+            } catch (e: TwitterException) {
+                handleTwitterException(e)
+                continue
+            } catch (e:Exception){
                 delay(10000)
             }
         }
