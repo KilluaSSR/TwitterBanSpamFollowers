@@ -74,14 +74,13 @@ sudo pacman -S jdk21-openjdk
       --access-secret=<key>  OAuth access token secret
       --dry-run              Print destructive actions instead of performing them
       --picture              Block users with default profile pictures
-      --register=<int>       Block users registered within the specified number
-                            of months
+      --register=<int>       Block users registered within the specified number of months
       --spam=<int>           Block users with 0 fans but too many followings
       --locked               Block users who have protected their tweets
       --include-site         Also scan the user's website link
       --include-location     Also scan the user's location string
-      --ratio=<int>          Block users with a followings-to-followers ratio
-                            higher than the specified value
+      --delay=<int>          Delay between fetching two users must be specified in milliseconds. A high delay can significantly extend the processing time, but it will make the process more stable. Note that 1 second equals 1000 milliseconds. The default value is 100 milliseconds, and it must be greater than 80 milliseconds.
+      --ratio=<int>          Block users with a followings-to-followers ratio higher than the specified value
       -h, --help             Show this message and exit
 
    ```
@@ -144,3 +143,40 @@ java -jar app.jar execute
 ```
 
 最终结果是，所有包含`crypto`的人都会被block，**但是包含`男高`的那部分例外。**
+
+## ✨运行截图
+
+### 1.判断过程
+
+#### 判断过程中，若有符合要求的，会有红字提示、并列举原因。
+
+![截图](images/Program-1.png)
+
+### 2.Block过程
+
+#### Block过程中，会提示ID、用户名、账号、主页链接。有确认步骤。
+
+![截图](images/Program-2.png)
+
+## ❓Q&A环节到了
+
+### Q1. 运行过程中总出现TwitterException/SSLHandshakeException/EOFException/没有对所有用户都进行判断就进入了Block环节
+
+#### A1. 这是推特原因，没有能*根治*的方法。但是可以得到一定缓解。以下供参考：
+
+1. 选择更稳定的网络连接。网络波动会导致程序不按预期运行。
+2. 鉴于多数人都是用VPN，可以考虑等一会儿再试试，也许你这会儿梯子并不稳定。有时候20个就停止了，有时候2000个也能正常运行。
+3. 使用`--delay`参数设置延迟时间。一般100为宜(默认值)，小于80容易出现Rate Limit的问题，过大会导致运行时*显著增长*
+   。该值为毫秒。若设置为200，有3000粉丝，不考虑网络传输以及判断逻辑等耗时，需要耗费600秒(10分钟)在等待上。
+
+### Q2. 为什么内置屏蔽词基本上都是屏蔽键政、黄推、币圈、Web3？
+
+#### A2. 说什么呢我的朋友，不B这些B谁啊？你可以选择更换字典或者设置排除词汇，当然了，你也可以选择不用。
+
+### Q3. 编译过程Gradle报错了
+
+#### A3. 是的。但是不影响编译，仍然能编译Jar出来，作者等有时间改（嗯），，。要是能帮忙康康提PR那感激不尽捏呜呜呜，，，
+
+### Q4. 你怎么把API公开发出来了！！这不是收费的吗？
+
+#### A4. 没错，API是明文存储而且开源的发出来了。但是这是Twitter官方Mac客户端内部的API，谷歌一下，你也能搜到（）既然推特都漏成筛子了，也不差我这点捏。
