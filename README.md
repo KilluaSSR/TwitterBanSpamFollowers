@@ -6,7 +6,7 @@
 
 ## 🛠️ 安装
 
-首先，确保您的机器上已安装 Java。您可以从 [Oracle](https://www.oracle.com/java/technologies/javase-jdk21-downloads.html)
+首先，确保您的机器上已安装 Java。您可以从 [Oracle](https://www.oracle.com/java/technologies/javase-jdk11-downloads.html)
 下载，或者使用您喜欢的包管理器，例如：
 
 ### **Homebrew：**
