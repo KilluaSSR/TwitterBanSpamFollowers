@@ -9,6 +9,7 @@ version = "1.0-SNAPSHOT"
 
 repositories {
     mavenCentral()
+    mavenLocal()
 }
 
 application {
@@ -16,12 +17,14 @@ application {
 }
 
 dependencies {
+    implementation("com.twitter:twitter-api-java-sdk:2.0.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
     implementation("com.github.ajalt.clikt:clikt:4.4.0")
     implementation("com.google.code.gson:gson:2.10.1")
     implementation("org.twitter4j:twitter4j-core:4.1.2")
     implementation("com.github.scribejava:scribejava-apis:8.3.3")
     testImplementation(kotlin("test"))
+
 }
 
 tasks.test {

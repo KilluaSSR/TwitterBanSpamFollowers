@@ -14,7 +14,7 @@ fun main(vararg args: String) {
     initialize("sensitive_word_dict.txt")
     NoOpCliktCommand(name = "<FileName.jar>")
         .apply {
-            subcommands(AuthCommand(), RunCommand(), Execute(),TimelineBlocker())
+            subcommands(AuthCommand(), RunCommand(), Execute())
         }
         .main(args)
 }
