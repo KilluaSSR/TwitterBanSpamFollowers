@@ -192,6 +192,39 @@ fun spam(
     return BlockCheckResult(shouldBlock, matchingKeywords)
 }
 
+//suspend fun blocker(
+//    usersToBlock: MutableMap<Long, Array<String>>,
+//    users: UsersResources,
+//    dryRun: Boolean,
+//) {
+//    if (usersToBlock.isNotEmpty()) {
+//        println("Users to block:")
+//        usersToBlock.forEach { (id, details) ->
+//            val (screenName, name) = details
+//            val profileUrl = "https://twitter.com/$name"
+//            println("ID: $id, Screen Name: $screenName, ID: $name, Profile URL: $profileUrl ")
+//        }
+//        println("${RED_TEXT} You should manually review each user pending block to prevent mistakes. ${RESET_TEXT}")
+//    } else {
+//        println("Nothing to block.")
+//        return
+//    }
+//
+//    if (!dryRun && getConfirmation("Enter 'ok' to block these users or any other key to cancel: ")) {
+//        println("Blocking users...")
+//        processUserBlocking(
+//            usersToBlock,
+//            users,
+//            dryRun,
+//            ::handleTwitterException
+//        )
+//        refreshUsersToBlockFile(usersToBlock)
+//        println("All specified users have been blocked.")
+//    } else {
+//        println("Operation cancelled.")
+//    }
+//}
+
 suspend fun blocker(
     usersToBlock: MutableMap<Long, Array<String>>,
     users: UsersResources,
@@ -201,8 +234,8 @@ suspend fun blocker(
         println("Users to block:")
         usersToBlock.forEach { (id, details) ->
             val (screenName, name) = details
-            val profileUrl = "https://twitter.com/$name"
-            println("ID: $id, Screen Name: $screenName, ID: $name, Profile URL: $profileUrl ")
+            val profileUrl = "https://twitter.com/$screenName"
+            println("ID: $id, Screen Name: $screenName, Name: $name, Profile URL: $profileUrl ")
         }
         println("${RED_TEXT} You should manually review each user pending block to prevent mistakes. ${RESET_TEXT}")
     } else {
@@ -210,7 +243,42 @@ suspend fun blocker(
         return
     }
 
-    if (!dryRun && getConfirmation("Enter 'ok' to block these users or any other key to cancel: ")) {
+    while (true) {
+        println("Enter the IDs of the users you don't want to block (separated by commas), or type 'ok' to start blocking:")
+        val input = readlnOrNull()?.trim()
+
+        if (input.equals("ok", ignoreCase = true)) {
+            break
+        }
+
+        input?.split(",")?.map { it.trim().toLongOrNull() }?.forEach { idToExclude ->
+            if (idToExclude != null && usersToBlock.containsKey(idToExclude)) {
+                usersToBlock.remove(idToExclude)
+                println("User with ID $idToExclude has been excluded from blocking.\n\n")
+            } else if (idToExclude != null) {
+                println("User ID $idToExclude not found in the block list.\n\n")
+            } else {
+                println("Invalid input detected in the list. Please ensure all entries are valid user IDs.\n\n")
+            }
+        }
+
+        refreshUsersToBlockFile(usersToBlock)
+
+        usersToBlock.forEach { (id, details) ->
+            val (screenName, name) = details
+            println("Username: $screenName")
+            println("User ID: $id")
+            println("Profile URL: https://twitter.com/$name\n")
+        }
+    }
+
+    // 显示更新后的列表并开始block
+    if (usersToBlock.isEmpty()) {
+        println("No users left to block after exclusions.")
+        return
+    }
+
+    if (!dryRun) {
         println("Blocking users...")
         processUserBlocking(
             usersToBlock,
@@ -221,7 +289,7 @@ suspend fun blocker(
         refreshUsersToBlockFile(usersToBlock)
         println("All specified users have been blocked.")
     } else {
-        println("Operation cancelled.")
+        println("Dry run completed. No users were blocked.")
     }
 }
 

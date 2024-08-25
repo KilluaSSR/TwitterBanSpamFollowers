@@ -112,6 +112,7 @@ fun refreshFileWithCachedIds(file: File, cachedIds: Set<Long>) {
     }
 }
 
+
 fun refreshUsersToBlockFile(users: Map<Long, Array<String>>) {
     // Clear the file contents
     usersToBlockFile.writeText("")
