@@ -26,8 +26,9 @@ fun shouldBlock(
 ): BlockCheckResult {
     val matchingKeywords = mutableListOf<String>()
 
-    // 检查用户名是否包含任何配置的黑名单关键词
-    val usernameMatches = checkKeywords(user.screenName, blockingConfig.userKeywords, matchingKeywords)
+    // 检查用户名是否包含任何配置的黑名单关键词或敏感词
+    val usernameMatches = checkKeywords(user.screenName, blockingConfig.userKeywords, matchingKeywords) +
+        isKeywordPresent(user.screenName)
     if (usernameMatches.isNotEmpty()) {
         // 检查用户名是否包含任何配置的白名单关键词
         val excludeMatches = checkKeywords(user.screenName, blockingConfig.excludeKeywords, matchingKeywords)
@@ -43,8 +44,9 @@ fun shouldBlock(
         return BlockCheckResult(true, usernameMatches.map { "Username keyword match: $it" })
     }
 
-    // 检查描述是否包含任何配置的黑名单关键词
-    val descriptionMatches = checkKeywords(user.description, blockingConfig.userKeywords, matchingKeywords)
+    // 检查描述是否包含任何配置的黑名单关键词或敏感词
+    val descriptionMatches = checkKeywords(user.description, blockingConfig.userKeywords, matchingKeywords) +
+        isKeywordPresent(user.description)
     if (descriptionMatches.isNotEmpty()) {
         // 检查描述是否包含任何配置的白名单关键词
         val excludeMatches = checkKeywords(user.description, blockingConfig.excludeKeywords, matchingKeywords)
@@ -61,8 +63,9 @@ fun shouldBlock(
     }
 
     if (includeLocation) {
-        // 检查位置是否包含任何配置的黑名单关键词
-        val locationMatches = checkKeywords(user.location, blockingConfig.userKeywords, matchingKeywords)
+        // 检查位置是否包含任何配置的黑名单关键词或敏感词
+        val locationMatches = checkKeywords(user.location, blockingConfig.userKeywords, matchingKeywords) +
+            isKeywordPresent(user.location)
         if (locationMatches.isNotEmpty()) {
             // 检查位置是否包含任何配置的白名单关键词
             val excludeMatches = checkKeywords(user.location, blockingConfig.excludeKeywords, matchingKeywords)
@@ -80,8 +83,9 @@ fun shouldBlock(
     }
 
     if (includeSite) {
-        // 检查网址是否包含任何配置的黑名单关键词
-        val urlMatches = checkKeywords(user.url, blockingConfig.userKeywords, matchingKeywords)
+        // 检查网址是否包含任何配置的黑名单关键词或敏感词
+        val urlMatches = checkKeywords(user.url, blockingConfig.userKeywords, matchingKeywords) +
+            isKeywordPresent(user.url)
         if (urlMatches.isNotEmpty()) {
             // 检查网址是否包含任何配置的白名单关键词
             val excludeMatches = checkKeywords(user.url, blockingConfig.excludeKeywords, matchingKeywords)
@@ -298,6 +302,28 @@ suspend fun processUserBlocking(
         }
     }
 
+}
+
+fun checkPost(
+    post: String,
+): BlockCheckResult {
+    val matchingKeywords = mutableListOf<String>()
+    val postMatches = checkKeywords(post, blockingConfig.userKeywords, matchingKeywords) +
+        isKeywordPresent(post)
+    if (postMatches.isNotEmpty()) {
+        val excludeMatches = checkKeywords(post, blockingConfig.excludeKeywords, matchingKeywords)
+        if (excludeMatches.isNotEmpty()) {
+            return BlockCheckResult(
+                false,
+                postMatches.map {
+                    "Matched blacklist keyword: $it, but also matched whitelist keyword: ${
+                        excludeMatches.joinToString(", ")
+                    }. Not blocking."
+                })
+        }
+        return BlockCheckResult(true, postMatches.map { "Username keyword match: $it" })
+    }
+    return BlockCheckResult(false, emptyList())
 }
 
 fun getConfirmation(prompt: String): Boolean {
