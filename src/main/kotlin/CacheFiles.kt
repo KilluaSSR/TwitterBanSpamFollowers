@@ -45,7 +45,7 @@ fun deleteCredentialsFile() {
 }
 
 fun saveIdsToFile(ids: List<Long>) {
-    idsFile.writeText("") 
+    idsFile.writeText("")
     PrintWriter(idsFile).use { writer ->
         ids.forEach { writer.println(it) }
     }

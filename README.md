@@ -50,7 +50,7 @@ sudo pacman -S jdk21-openjdk
 
 ### 2. **Run命令：**
 
-例如，要Block使用默认个人资料图片、在过去 3 个月内注册且关注者与被关注者比例大于 20:1 的用户，请使用以下命令：
+例如，要Block**同时**使用默认个人资料图片、在过去 3 个月内注册且关注者与被关注者比例大于 20:1 的用户，请使用以下命令：
 
    ```bash
    java -jar app.jar run --picture --register 3 --ratio 20
@@ -62,7 +62,7 @@ sudo pacman -S jdk21-openjdk
     java -jar app.jar run --help
    ```
 
-这将显示可用的用法和选项，您可以将它们组合使用。
+这将显示可用的用法和选项，您可以将它们组合使用。注意，无论您使用了一个还是多个flag，都是在*同时满足*的情况下才会判断为Block。
 
    ```bash
     Usage: <FileName.jar> run [<options>]
@@ -90,7 +90,28 @@ sudo pacman -S jdk21-openjdk
 其中`--access-token=<key>`和`--access-secret=<key>`已经在**Twitter 进行身份验证**步骤获得，将根据目录下的缓存文件
 `twitter_credentials.properties`读取，不需要额外指定。
 
+### 2.1 推荐参数
+
+由于错误的Block人是一件麻烦的事。使用以下推荐方案可以减少这种情况。
+
+1. 使用*同时满足*使用默认头像、3个月内注册、关注数与粉丝比例大于20的。这种情况下可以排除绝大多数正常人。
+   ```bash
+   java -jar app.jar run --picture --register 3 --ratio 20
+   ```
+2. 使用*同时满足*使用默认头像、锁推、关注数与粉丝比例大于20的。这种情况下也可以排除绝大多数正常人。
+   ```bash
+   java -jar app.jar run --picture --locked --ratio 20
+   ```
+
 ### 3. **Execute命令：**
+
+由于众多因素如
+
+1. 网络不稳定导致无法完全运行，那么就先屏蔽已经扫描出来的吧
+2. 粉丝数太多，不想等那么久，Run命令跑一会就不想等了，那么就先屏蔽已经扫描出来的吧
+3. Run后发现有不需要屏蔽的用户，此时需要手动在`users_to_block.json`中删去（后续会添加在程序内删除的逻辑 嗯嗯画饼了，，，）
+
+等原因，你可能会用到这个命令。
 
 此命令将根据 `users_to_block.json` 文件开始Block其中的用户。
 
@@ -125,7 +146,8 @@ java -jar app.jar execute
 }
 ```
 
-顾名思义，`userKeywords`就是您要在内置敏感词的基础上额外新加的敏感词列表,则是排除项。有时候，并不能根据设置的敏感词很好的区分一个人是否需要block，
+顾名思义，`userKeywords`就是您要在内置敏感词的基础上额外新加的敏感词列表,`excludeKeywords`
+则是排除项。有时候，并不能根据设置的敏感词很好的区分一个人是否需要block，
 `excludeKeywords`则在这时候派上了用场。
 
 例如，在假设内置敏感词文件中**没有**`crypto`这一项。那么，在如下设置中，就会考虑block包含敏感词`crypto`的人。但是假设他同时又包含关键词
