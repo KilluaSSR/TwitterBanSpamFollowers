@@ -168,9 +168,9 @@ fun spam(
             }
         }
 
-        if (spamConverted != null && picture) {
+        if (spamConverted != null) {
             val noFansButTooManyFollowing =
-                user.followersCount == 0 && user.friendsCount > spamConverted && user.profileImageURL.contains("default_profile_images")
+                user.followersCount == 0 && user.friendsCount > spamConverted
             if (noFansButTooManyFollowing) {
                 matchingKeywords.add("0 Fans but too many following with default profile image")
             } else {
@@ -191,39 +191,6 @@ fun spam(
 
     return BlockCheckResult(shouldBlock, matchingKeywords)
 }
-
-//suspend fun blocker(
-//    usersToBlock: MutableMap<Long, Array<String>>,
-//    users: UsersResources,
-//    dryRun: Boolean,
-//) {
-//    if (usersToBlock.isNotEmpty()) {
-//        println("Users to block:")
-//        usersToBlock.forEach { (id, details) ->
-//            val (screenName, name) = details
-//            val profileUrl = "https://twitter.com/$name"
-//            println("ID: $id, Screen Name: $screenName, ID: $name, Profile URL: $profileUrl ")
-//        }
-//        println("${RED_TEXT} You should manually review each user pending block to prevent mistakes. ${RESET_TEXT}")
-//    } else {
-//        println("Nothing to block.")
-//        return
-//    }
-//
-//    if (!dryRun && getConfirmation("Enter 'ok' to block these users or any other key to cancel: ")) {
-//        println("Blocking users...")
-//        processUserBlocking(
-//            usersToBlock,
-//            users,
-//            dryRun,
-//            ::handleTwitterException
-//        )
-//        refreshUsersToBlockFile(usersToBlock)
-//        println("All specified users have been blocked.")
-//    } else {
-//        println("Operation cancelled.")
-//    }
-//}
 
 suspend fun blocker(
     usersToBlock: MutableMap<Long, Array<String>>,
