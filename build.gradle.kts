@@ -17,7 +17,6 @@ application {
 }
 
 dependencies {
-    implementation("com.twitter:twitter-api-java-sdk:2.0.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
     implementation("com.github.ajalt.clikt:clikt:4.4.0")
     implementation("com.google.code.gson:gson:2.10.1")

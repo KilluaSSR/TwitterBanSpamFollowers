@@ -1,10 +1,14 @@
 package killua.dev
 
 import com.fasterxml.jackson.annotation.JsonInclude.Include
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 import twitter4j.TwitterException
 import twitter4j.v1.User
 import twitter4j.v1.UsersResources
+import withRetry
 import java.io.IOException
 import java.time.LocalDateTime
 import javax.net.ssl.SSLHandshakeException
@@ -208,7 +212,7 @@ suspend fun blocker(
             val profileUrl = "https://twitter.com/$screenName"
             println("ID: $id, Screen Name: $screenName, Name: $name, Profile URL: $profileUrl ")
         }
-        println("${RED_TEXT} You should manually review each user pending block to prevent mistakes. ${RESET_TEXT}")
+        println("${RED_TEXT}You should manually review each user pending block to prevent mistakes. ${RESET_TEXT}")
     } else {
         println("Nothing to block.")
         return
@@ -254,8 +258,7 @@ suspend fun blocker(
         processUserBlocking(
             usersToBlock,
             users,
-            dryRun,
-            ::handleTwitterException
+            dryRun
         )
         refreshUsersToBlockFile(usersToBlock)
         println("All specified users have been blocked.")
@@ -267,66 +270,59 @@ suspend fun blocker(
 suspend fun processUserBlocking(
     usersToBlock: MutableMap<Long, Array<String>>,
     users: UsersResources,
-    dryRun: Boolean,
-    handleRateLimitStatus: (TwitterException) -> Unit
+    dryRun: Boolean
 ) {
-    val idsToRemove = mutableListOf<Long>()
-
-    val iterator = usersToBlock.keys.iterator()
-
-    while (iterator.hasNext()) {
-        val id = iterator.next()
-        if (!dryRun) {
-            try {
-                delay(500)
-                users.createBlock(id)
-                idsToRemove.add(id)
-            } catch (e: SSLHandshakeException) {
-                println("SSL握手失败: ${e.message}")
-                delay(5000)
-            } catch (e: IOException) {
-                println("IO异常: ${e.message}")
-                delay(5000)
-            } catch (e: TwitterException) {
-                handleRateLimitStatus(e)
-            } catch (e: Exception) {
-                println("Error blocking user $id: ${e.message}")
+    val exceptionHandler = CoroutineExceptionHandler { _, exception ->
+        println("Caught $exception")
+    }
+    supervisorScope {
+        try {
+            launch(exceptionHandler) {
+                val idsToRemove = mutableListOf<Long>()
+                val iterator = usersToBlock.keys.iterator()
+                while (iterator.hasNext()) {
+                    val id = iterator.next()
+                    if (!dryRun) {
+                        try {
+                            users.showUser(id)
+                        } catch (e: TwitterException) {
+                            println(e)
+                            continue
+                        }
+                        withRetry {
+                            delay(90)
+                            rateLimitStatus.sleepIfNeeded()
+                            users.createBlock(id)
+                            println("ID blocking now: $id")
+                            idsToRemove.add(id)
+                        } ?: {
+                            removeIds(idsToRemove, usersToBlock)
+                            throw Exception("Exceeded max retries.")
+                        }
+                    }
+                }
+                if (!dryRun) {
+                    removeIds(idsToRemove, usersToBlock)
+                }
             }
-        } else {
-            println(id)
+        } catch (e: Exception) {
+            // Handle exceptions from the supervisor scope
+            println("Supervisor scope error: ${e.message}")
         }
     }
-    if (!dryRun) {
-        idsToRemove.forEach { id ->
-            usersToBlock.remove(id)
-        }
+}
+
+private fun removeIds(
+    idsToRemove: MutableList<Long>,
+    usersToBlock: MutableMap<Long, Array<String>>
+) {
+    idsToRemove.forEach { id ->
+        usersToBlock.remove(id)
     }
-
 }
 
-fun checkPost(
-    post: String,
-): BlockCheckResult {
-    val matchingKeywords = mutableListOf<String>()
-    val postMatches = checkKeywords(post, blockingConfig.userKeywords, matchingKeywords) +
-        isKeywordPresent(post)
-    if (postMatches.isNotEmpty()) {
-        val excludeMatches = checkKeywords(post, blockingConfig.excludeKeywords, matchingKeywords)
-        if (excludeMatches.isNotEmpty()) {
-            return BlockCheckResult(
-                false,
-                postMatches.map {
-                    "Matched blacklist keyword: $it, but also matched whitelist keyword: ${
-                        excludeMatches.joinToString(", ")
-                    }. Not blocking."
-                })
-        }
-        return BlockCheckResult(true, postMatches.map { "Username keyword match: $it" })
-    }
-    return BlockCheckResult(false, emptyList())
-}
 
-fun getConfirmation(prompt: String): Boolean {
-    val confirmation = readLineWithPrompt(prompt)
-    return confirmation.trim().equals("ok", ignoreCase = true)
-}
+
+
+
+

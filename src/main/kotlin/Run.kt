@@ -8,6 +8,7 @@ import kotlinx.coroutines.*
 import twitter4j.TwitterException
 import twitter4j.v1.RateLimitStatus
 import twitter4j.v1.UsersResources
+import withRetry
 import javax.net.ssl.SSLHandshakeException
 
 var rateLimitStatus: RateLimitStatus = RateLimit.Unlimited
@@ -129,9 +130,7 @@ class RunCommand : CliktCommand(
                         rateLimitStatus = ids.rateLimitStatus ?: RateLimit.Unlimited
                         println("Done. (count=${ids.iDs.size}, hasMore=${cursor != 0L})\n")
 
-
                         saveIdsToFile(ids.iDs.toList())
-
 
                         rateLimitStatus.sleepIfNeeded(callCount = 2)
                         val cachedIds = loadIdsFromFile().toMutableSet()
@@ -188,31 +187,6 @@ class RunCommand : CliktCommand(
         }
     }
 
-    // Retry logic for Twitter API calls
-    private suspend fun <T> withRetry(
-        maxRetries: Int = 10, // 设置最大重试次数为 10
-        initialDelay: Long = 1000L,
-        factor: Double = 2.0,
-        block: suspend () -> T
-    ): T? {
-        var currentDelay = initialDelay
-        repeat(maxRetries) {
-            try {
-                return block()
-            } catch (e: TwitterException) {
-                handleTwitterException(e)
-                delay(currentDelay)
-                currentDelay = (currentDelay * factor).toLong()
-            } catch (e: SSLHandshakeException) {
-                println("SSL Handshake failed, retrying in 5 seconds...")
-                delay(5000)
-            } catch (e: Exception) {
-                println("Unexpected error occurred, retrying in 10 seconds...")
-                delay(10000)
-            }
-        }
-        return null // 在重试次数用完后返回 null
-    }
 
     private suspend fun processCachedIds(
         cachedIds: MutableSet<Long>,
