@@ -12,10 +12,10 @@ import eu.vendeli.tgbot.TelegramBot
 import eu.vendeli.tgbot.annotations.CommonHandler
 import eu.vendeli.tgbot.api.message.SendMessageAction
 import eu.vendeli.tgbot.api.message.message
+import eu.vendeli.tgbot.types.LinkPreviewOptions
+import eu.vendeli.tgbot.types.ParseMode
 import eu.vendeli.tgbot.types.User
 import eu.vendeli.tgbot.types.internal.MessageUpdate
-import kotlinx.coroutines.flow.drop
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
 import org.bson.types.ObjectId
 import java.time.LocalDateTime
@@ -29,15 +29,15 @@ import java.time.LocalDateTime
 suspend fun difffo(update: MessageUpdate, bot: TelegramBot, user: User) {
     val params = update.message.params()
     check(params).use { return it.send(user, bot) }
-    println(params)
     val screenName = params.first().lowercase()
     val collection = mongoDB.getCollection<FollowerSnapshot>("follower_snapshots")
     try {
         val snaps = collection
             .find(Filters.eq("twitterScreenName", screenName))
-            .sort(Sorts.ascending("createdTime"))
+            .sort(Sorts.descending("createdTime"))
+            .limit(6)
 
-        val results = diffUserResults(snaps)
+        val results = diffUserResults(snaps).filter { (it.diff?.count() ?: 0) != 0 } // 过滤粉丝没有变动的
         val allUserIds = results.map { it.diff.allResults() }.flatten().toLongArray()
 
         val userMap = twitter.v1().users().lookupUsers(*allUserIds).associateBy { it.id }
@@ -50,11 +50,15 @@ suspend fun difffo(update: MessageUpdate, bot: TelegramBot, user: User) {
                 )
                 this.currentSnap = it.currentSnap
             }
-        }.filter { (it.diff?.count() ?: 0) != 0 } // 过滤粉丝没有变动的
+        }
 
         val returnedText = diffUsers.joinToString("\n========\n") { it.tgDescription() } //! 如果文本过长，消息无法返回
-        println(returnedText)
-        message { returnedText }.send(user, bot)
+        message { returnedText }
+            .options {
+                parseMode = ParseMode.HTML
+                linkPreviewOptions = LinkPreviewOptions(isDisabled = true)
+            }
+            .send(user, bot)
     }
     catch (e: Exception) {
         e.printStackTrace()
@@ -103,7 +107,7 @@ suspend fun snap(update: MessageUpdate, bot: TelegramBot, user: User) {
 private suspend fun diffUserResults(snaps: FindFlow<FollowerSnapshot>): List<UserDiffResult<Long>> {
     var last: Set<Long> = HashSet()
     var current: Set<Long>
-    val diffResults = snaps.map { snap ->
+    val diffResults = snaps.toList().reversed().map { snap ->
         current = snap.followerIds?.toSet().orEmpty()
         val diff = last.diff(current) { it }
         val r = UserDiffResult<Long>().apply {
@@ -113,7 +117,7 @@ private suspend fun diffUserResults(snaps: FindFlow<FollowerSnapshot>): List<Use
         last = current
         r
     }.drop(1).toList()
-    return diffResults
+    return diffResults.reversed()
 }
 
 private fun check(params: List<String>): SendMessageAction? {

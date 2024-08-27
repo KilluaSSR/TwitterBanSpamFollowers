@@ -31,8 +31,10 @@ class UserDiffResult<ID> {
 
 fun UserDiffResult<User>.tgDescription() =
     """
-     |Time: ${currentSnap?.createdTime ?: "#UNKNOWN#"}
-     |New Followers: [${diff?.added?.joinToString(", ") { it.tgDescription() }}]
-     |Unfollowers: [${diff?.deleted?.joinToString(", ") { it.tgDescription() } ?: "None"}]
-     |Total: ${currentSnap?.followerIds?.size ?: "#UNKNOWN#"}
+     |${currentSnap?.createdTime ?: "#UNKNOWN#"} Total: <b>${currentSnap?.followerIds?.size ?: "#UNKNOWN#"}</b>
+     |${diff?.added.tgDescription().let { if (it.isNotEmpty()) "+ $it" else "" }}
+     |${diff?.deleted.tgDescription().let { if (it.isNotEmpty()) "- $it" else "" }}
     """.trimMargin()
+
+private fun Collection<User>?.tgDescription() =
+    this?.joinToString("  ") { it.tgDescription() }.orEmpty()
