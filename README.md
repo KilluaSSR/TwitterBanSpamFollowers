@@ -201,3 +201,8 @@ java -jar app.jar execute
 ### Q4. 你怎么把API公开发出来了！！这不是收费的吗？
 
 #### A4. 没错，API是明文存储而且开源的发出来了。但是这是Twitter官方Mac客户端内部的API，谷歌一下，你也能搜到（）既然推特都漏成筛子了，也不差我这点捏。
+
+## 🤔 使用出现问题?
+
+- 提issue就行，记得*务必*带上报错截图和*准确的描述*你做了什么，方便我定位。不然复现不出来的话我没办法解决。
+- 不会提issue也没关系，给我的[telegram](t.me/killua_chatbot)或者[twitter](twitter.com/killuadev_kt)发私信就可以了，要求同上。
