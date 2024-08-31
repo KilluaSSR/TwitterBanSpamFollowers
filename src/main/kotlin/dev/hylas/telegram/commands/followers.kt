@@ -20,16 +20,34 @@ import kotlinx.coroutines.flow.toList
 import org.bson.types.ObjectId
 import java.time.LocalDateTime
 
+@CommonHandler.Regex("^/detectfo.*\$")
+suspend fun delectfo(update: MessageUpdate, bot: TelegramBot, user: User) {
+    val params = update.message.params()
+    check(params).use { return it.send(user, bot) }
+    val screenName = params.first().lowercase()
+    doSnap(screenName, user, bot)
+    doDiff(screenName, user, bot)
+}
+
+
 /**
  * diff followers
  *
  * @author <a href="x.com/aka_hylas">Hylas</a>
  */
-@CommonHandler.Regex("^/difffo.*\$")
+// @CommonHandler.Regex("^/difffo.*\$")
 suspend fun difffo(update: MessageUpdate, bot: TelegramBot, user: User) {
     val params = update.message.params()
     check(params).use { return it.send(user, bot) }
     val screenName = params.first().lowercase()
+    doDiff(screenName, user, bot)
+}
+
+private suspend fun doDiff(
+    screenName: String,
+    user: User,
+    bot: TelegramBot
+) {
     val collection = mongoDB.getCollection<FollowerSnapshot>("follower_snapshots")
     try {
         val snaps = collection
@@ -70,16 +88,29 @@ suspend fun difffo(update: MessageUpdate, bot: TelegramBot, user: User) {
 /**
  * @author <a href="x.com/aka_hylas">Hylas</a>
  */
-@CommonHandler.Regex("^/snapfo.*$")
+// @CommonHandler.Regex("^/snapfo.*$")
 suspend fun snap(update: MessageUpdate, bot: TelegramBot, user: User) {
     val params = update.message.params()
     check(params).use { return it.send(user, bot) }
 
     val screenName = params.first().lowercase()
+    doSnap(screenName, user, bot)
+}
+
+private suspend fun doSnap(
+    screenName: String,
+    user: User,
+    bot: TelegramBot
+) {
     val twitter = twitter.v1()
     val screenUser =
-        twitter.users().lookupUsers(screenName).firstOrNull() ?: return message { "No user found." }.send(user, bot)
-    val followerIds = twitter.friendsFollowers().getFollowersIDs(screenName, -1)
+        twitter.users().lookupUsers(screenName).firstOrNull()
+    if (screenUser == null) {
+        message { "No user found." }.send(user, bot)
+        return
+    }
+    val followerIds = twitter.friendsFollowers().getFollowersIDs(screenName, -1) // TODO: try
+
     val followerSnapshot = FollowerSnapshot(
         ObjectId(),
         screenUser.id,
