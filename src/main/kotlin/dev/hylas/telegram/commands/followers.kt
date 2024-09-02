@@ -4,6 +4,7 @@ import com.mongodb.client.model.Filters
 import com.mongodb.client.model.Sorts
 import com.mongodb.kotlin.client.coroutine.FindFlow
 import dev.hylas.telegram.extension.diff
+import dev.hylas.telegram.extension.lookupUsersWithoutLimit
 import dev.hylas.telegram.extension.params
 import dev.hylas.telegram.extension.use
 import dev.hylas.telegram.mongoDB
@@ -16,11 +17,17 @@ import eu.vendeli.tgbot.types.LinkPreviewOptions
 import eu.vendeli.tgbot.types.ParseMode
 import eu.vendeli.tgbot.types.User
 import eu.vendeli.tgbot.types.internal.MessageUpdate
+import eu.vendeli.tgbot.types.internal.UpdateType
 import kotlinx.coroutines.flow.toList
 import org.bson.types.ObjectId
 import java.time.LocalDateTime
 
-@CommonHandler.Regex("^/detectfo.*\$")
+// @CommonHandler.Regex("^/test.*\$", scope = [UpdateType.MESSAGE, UpdateType.EDIT_MESSAGE])
+// suspend fun testCmd(bot: TelegramBot, user: User) {
+//     message { "Test CMD" }.send(user, bot)
+// }
+
+@CommonHandler.Regex("^/detectfo.*\$", scope = [UpdateType.MESSAGE, UpdateType.EDIT_MESSAGE])
 suspend fun delectfo(update: MessageUpdate, bot: TelegramBot, user: User) {
     val params = update.message.params()
     check(params).use { return it.send(user, bot) }
@@ -29,13 +36,12 @@ suspend fun delectfo(update: MessageUpdate, bot: TelegramBot, user: User) {
     doDiff(screenName, user, bot)
 }
 
-
 /**
  * diff followers
  *
  * @author <a href="x.com/aka_hylas">Hylas</a>
  */
-// @CommonHandler.Regex("^/difffo.*\$")
+@CommonHandler.Regex("^/difffo.*\$", scope = [UpdateType.MESSAGE, UpdateType.EDIT_MESSAGE])
 suspend fun difffo(update: MessageUpdate, bot: TelegramBot, user: User) {
     val params = update.message.params()
     check(params).use { return it.send(user, bot) }
@@ -57,8 +63,7 @@ private suspend fun doDiff(
 
         val results = diffUserResults(snaps).filter { (it.diff?.count() ?: 0) != 0 } // 过滤粉丝没有变动的
         val allUserIds = results.map { it.diff.allResults() }.flatten().toLongArray()
-
-        val userMap = twitter.v1().users().lookupUsers(*allUserIds).associateBy { it.id }
+        val userMap = twitter.v1().users().lookupUsersWithoutLimit(*allUserIds).associateBy { it.id }
         val diffUsers = results.map {
             UserDiffResult<twitter4j.v1.User>().apply {
                 this.diff = DiffResult(
@@ -115,7 +120,7 @@ private suspend fun doSnap(
         ObjectId(),
         screenUser.id,
         screenUser.screenName.lowercase(),
-        screenUser.name.lowercase(),
+        screenUser.name,
         followerIds.iDs.toList(),
         LocalDateTime.now()
     )

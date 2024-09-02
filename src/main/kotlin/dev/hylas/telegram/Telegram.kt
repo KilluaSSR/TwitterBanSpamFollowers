@@ -4,7 +4,7 @@ import dev.hylas.telegram.extension.env
 import eu.vendeli.tgbot.TelegramBot
 
 private val telegramBot by lazy {
-    TelegramBot(env("TELEGRAM_BOT_TOKEN"))
+    TelegramBot(env("TELEGRAM_BOT_TOKEN"), "dev.hylas.telegram")
 }
 
 fun tgBot(): TelegramBot {

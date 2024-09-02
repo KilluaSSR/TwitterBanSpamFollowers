@@ -6,7 +6,8 @@ import eu.vendeli.tgbot.api.message.message
 import eu.vendeli.tgbot.types.User
 
 suspend fun main() {
-    tgBot().handleUpdates()
+    tgBot()
+        .handleUpdates()
 }
 
 @CommandHandler(["/start"])
