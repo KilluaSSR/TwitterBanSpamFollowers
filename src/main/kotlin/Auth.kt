@@ -33,7 +33,7 @@ class AuthCommand : CliktCommand(
             .apiSecret(apiSecret)
             .build(TwitterApi.instance())
 
-    private fun displayAccessTokenDetails( accessToken: com.github.scribejava.core.model.OAuth1AccessToken) {
+    private fun displayAccessTokenDetails( accessToken: OAuth1AccessToken) {
         println("\nSUCCESS!\n")
         println("Access token: ${accessToken.token}")
         println("Access token secret: ${accessToken.tokenSecret}")

@@ -2,7 +2,6 @@ package killua.dev
 
 import kotlinx.coroutines.delay
 import twitter4j.TwitterException
-import java.io.File
 
 suspend fun handleTwitterException(e: TwitterException) {
     when {

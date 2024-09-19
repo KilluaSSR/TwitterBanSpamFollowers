@@ -1,6 +1,5 @@
 package killua.dev
 
-import com.fasterxml.jackson.annotation.JsonInclude.Include
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -8,10 +7,7 @@ import kotlinx.coroutines.supervisorScope
 import twitter4j.TwitterException
 import twitter4j.v1.User
 import twitter4j.v1.UsersResources
-import withRetry
-import java.io.IOException
 import java.time.LocalDateTime
-import javax.net.ssl.SSLHandshakeException
 
 fun monthAgo(months: Int?): LocalDateTime {
     val monthsToSubtract = months ?: 3 // Default to 3 months if not specified

@@ -8,7 +8,6 @@ import kotlinx.coroutines.*
 import twitter4j.TwitterException
 import twitter4j.v1.RateLimitStatus
 import twitter4j.v1.UsersResources
-import withRetry
 import javax.net.ssl.SSLHandshakeException
 
 var rateLimitStatus: RateLimitStatus = RateLimit.Unlimited
