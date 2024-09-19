@@ -29,90 +29,75 @@ fun shouldBlock(
     ratioConverted: Double?
 ): BlockCheckResult {
     val matchingKeywords = mutableListOf<String>()
-
-    // 检查用户名是否包含任何配置的黑名单关键词或敏感词
-    val usernameMatches = checkKeywords(user.screenName, blockingConfig.userKeywords, matchingKeywords) +
-        isKeywordPresent(user.screenName)
-    if (usernameMatches.isNotEmpty()) {
-        // 检查用户名是否包含任何配置的白名单关键词
-        val excludeMatches = checkKeywords(user.screenName, blockingConfig.excludeKeywords, matchingKeywords)
-        if (excludeMatches.isNotEmpty()) {
-            return BlockCheckResult(
-                false,
-                usernameMatches.map {
-                    "Matched blacklist keyword: $it, but also matched whitelist keyword: ${
-                        excludeMatches.joinToString(", ")
-                    }. Not blocking."
-                })
-        }
-        return BlockCheckResult(true, usernameMatches.map { "Username keyword match: $it" })
+    val reasonList = mutableListOf<String>()
+    val screennameResult = checkField(user.screenName, "Screenname", matchingKeywords, reasonList)
+    if (screennameResult.shouldBlock) {
+        println("\nHis/Her Screenname:" +user.screenName)
+        screennameResult.reasonList += listOf("Screenname: ${user.screenName}")
+        return screennameResult
     }
 
-    // 检查描述是否包含任何配置的黑名单关键词或敏感词
-    val descriptionMatches = checkKeywords(user.description, blockingConfig.userKeywords, matchingKeywords) +
-        isKeywordPresent(user.description)
-    if (descriptionMatches.isNotEmpty()) {
-        // 检查描述是否包含任何配置的白名单关键词
-        val excludeMatches = checkKeywords(user.description, blockingConfig.excludeKeywords, matchingKeywords)
-        if (excludeMatches.isNotEmpty()) {
-            return BlockCheckResult(
-                false,
-                descriptionMatches.map {
-                    "Matched blacklist keyword: $it, but also matched whitelist keyword: ${
-                        excludeMatches.joinToString(", ")
-                    }. Not blocking."
-                })
-        }
-        return BlockCheckResult(true, descriptionMatches.map { "Description keyword match: $it" })
+    val usernameResult = checkField(user.name, "Username", matchingKeywords, reasonList)
+    if (usernameResult.shouldBlock) {
+        println("\nHis/Her Username:" +user.screenName)
+        usernameResult.reasonList += listOf("Username: $user.username")
+        return usernameResult
+    }
+
+    val descriptionResult = checkField(user.description, "Description", matchingKeywords, reasonList)
+    if (descriptionResult.shouldBlock) {
+        println("\nHis/Her Description:" +user.description)
+        descriptionResult.reasonList += listOf("Description: ${user.description}")
+        return descriptionResult
     }
 
     if (includeLocation) {
-        // 检查位置是否包含任何配置的黑名单关键词或敏感词
-        val locationMatches = checkKeywords(user.location, blockingConfig.userKeywords, matchingKeywords) +
-            isKeywordPresent(user.location)
-        if (locationMatches.isNotEmpty()) {
-            // 检查位置是否包含任何配置的白名单关键词
-            val excludeMatches = checkKeywords(user.location, blockingConfig.excludeKeywords, matchingKeywords)
-            if (excludeMatches.isNotEmpty()) {
-                return BlockCheckResult(
-                    false,
-                    locationMatches.map {
-                        "Matched blacklist keyword: $it, but also matched whitelist keyword: ${
-                            excludeMatches.joinToString(", ")
-                        }. Not blocking."
-                    })
-            }
-            return BlockCheckResult(true, locationMatches.map { "Location keyword match: $it" })
+        val locationResult = checkField(user.location, "Location", matchingKeywords, reasonList)
+        if (locationResult.shouldBlock) {
+            println("\nHis/Her Location:" +user.location)
+            locationResult.reasonList += listOf("Location: ${user.location}")
+            return locationResult
         }
     }
 
     if (includeSite) {
-        // 检查网址是否包含任何配置的黑名单关键词或敏感词
-        val urlMatches = checkKeywords(user.url, blockingConfig.userKeywords, matchingKeywords) +
-            isKeywordPresent(user.url)
-        if (urlMatches.isNotEmpty()) {
-            // 检查网址是否包含任何配置的白名单关键词
-            val excludeMatches = checkKeywords(user.url, blockingConfig.excludeKeywords, matchingKeywords)
-            if (excludeMatches.isNotEmpty()) {
-                return BlockCheckResult(
-                    false,
-                    urlMatches.map {
-                        "Matched blacklist keyword: $it, but also matched whitelist keyword: ${
-                            excludeMatches.joinToString(", ")
-                        }. Not blocking."
-                    })
-            }
-            return BlockCheckResult(true, urlMatches.map { "URL keyword match: $it" })
+        val urlResult = checkField(user.url, "URL", matchingKeywords, reasonList)
+        if (urlResult.shouldBlock) {
+            println("\nHis/Her Site:" +user.url)
+            urlResult.reasonList += listOf("Site: ${user.url}")
+            return urlResult
         }
     }
 
     val spamResult = checkSpamCriteria(user, picture, registerConverted, spamConverted, locked, ratioConverted)
     if (spamResult.shouldBlock) {
-        return BlockCheckResult(true, spamResult.matchingKeywords)
+        return BlockCheckResult(true, spamResult.matchingKeywords, listOf("Spam"))
     }
 
-    return BlockCheckResult(false, emptyList())
+    return BlockCheckResult(false, emptyList(), emptyList())
 }
+
+fun checkField(field: String?, fieldName: String, matchingKeywords: MutableList<String>, reasonList: MutableList<String>): BlockCheckResult {
+    if (field == null) return BlockCheckResult(false, emptyList(), emptyList())
+
+    val matches = checkKeywords(field, blockingConfig.userKeywords, matchingKeywords) + isKeywordPresent(field)
+    if (matches.isNotEmpty()) {
+        val excludeMatches = checkKeywords(field, blockingConfig.excludeKeywords, matchingKeywords)
+        if (excludeMatches.isNotEmpty()) {
+            return BlockCheckResult(
+                false,
+                matches.map {
+                    "Matched blacklist keyword: $it, but also matched whitelist keyword: ${
+                        excludeMatches.joinToString(", ")
+                    }. Not blocking."
+                },
+                emptyList())
+        }
+        return BlockCheckResult(true, matches.map { "$fieldName keyword match: $it" }, emptyList())
+    }
+    return BlockCheckResult(false, emptyList(), emptyList())
+}
+
 
 private fun checkKeywords(
     text: String,
@@ -149,55 +134,67 @@ fun spam(
     if (!picture && registerConverted == null && spamConverted == null && !locked && ratioConverted == null) {
         shouldBlock = false
     } else {
-        if (picture) {
-            val isProfileImageDefault = user.profileImageURL.contains("default_profile_images")
-            if (isProfileImageDefault) {
-                matchingKeywords.add("Default profile image")
-            } else {
-                shouldBlock = false
-            }
-        }
-
-        if (registerConverted != null) {
-            val isCreatedBefore = user.createdAt.isAfter(monthAgo(registerConverted))
-            if (isCreatedBefore) {
-                matchingKeywords.add("Account created within $registerConverted months")
-            } else {
-                shouldBlock = false
-            }
-        }
-
-        if (locked) {
-            val isLocked = user.isProtected
-            if (isLocked) {
-                matchingKeywords.add("Account is protected")
-            } else {
-                shouldBlock = false
-            }
-        }
-
-        if (spamConverted != null) {
-            val noFansButTooManyFollowing =
-                user.followersCount == 0 && user.friendsCount > spamConverted
-            if (noFansButTooManyFollowing) {
-                matchingKeywords.add("0 Fans but too many following with default profile image")
-            } else {
-                shouldBlock = false
-            }
-        }
-
-        if (ratioConverted != null) {
-            val friendsToFollowersRatioHigh =
-                user.followersCount > 0 && user.friendsCount / user.followersCount > ratioConverted
-            if (friendsToFollowersRatioHigh) {
-                matchingKeywords.add("High friends-to-followers ratio")
-            } else {
-                shouldBlock = false
-            }
-        }
+        shouldBlock = checkProfileImage(user, picture, matchingKeywords) &&
+                checkAccountCreation(user, registerConverted, matchingKeywords) &&
+                checkAccountProtection(user, locked, matchingKeywords) &&
+                checkSpamFollowing(user, spamConverted, matchingKeywords) &&
+                checkFriendsToFollowersRatio(user, ratioConverted, matchingKeywords)
     }
 
-    return BlockCheckResult(shouldBlock, matchingKeywords)
+    return BlockCheckResult(shouldBlock, matchingKeywords, listOf("Spam"))
+}
+fun checkProfileImage(user: User, picture: Boolean, matchingKeywords: MutableList<String>): Boolean {
+    if (picture) {
+        val isProfileImageDefault = user.profileImageURL.contains("default_profile_images")
+        if (isProfileImageDefault) {
+            matchingKeywords.add("Default profile image")
+            return true
+        }
+    }
+    return false
+}
+
+
+fun checkAccountCreation(user: User, registerConverted: Int?, matchingKeywords: MutableList<String>): Boolean {
+    if (registerConverted != null) {
+        val isCreatedBefore = user.createdAt.isAfter(monthAgo(registerConverted))
+        if (isCreatedBefore) {
+            matchingKeywords.add("Account created within $registerConverted months")
+            return true
+        }
+    }
+    return false
+}
+
+fun checkAccountProtection(user: User, locked: Boolean, matchingKeywords: MutableList<String>): Boolean {
+    if (locked) {
+        val isLocked = user.isProtected
+        if (isLocked) {
+            matchingKeywords.add("Account is protected")
+            return true
+        }
+    }
+    return false
+}
+fun checkFriendsToFollowersRatio(user: User, ratioConverted: Double?, matchingKeywords: MutableList<String>): Boolean {
+    if (ratioConverted != null) {
+        val friendsToFollowersRatioHigh = user.followersCount > 0 && user.friendsCount / user.followersCount > ratioConverted
+        if (friendsToFollowersRatioHigh) {
+            matchingKeywords.add("High friends-to-followers ratio")
+            return true
+        }
+    }
+    return false
+}
+fun checkSpamFollowing(user: User, spamConverted: Int?, matchingKeywords: MutableList<String>): Boolean {
+    if (spamConverted != null) {
+        val noFansButTooManyFollowing = user.followersCount == 0 && user.friendsCount > spamConverted
+        if (noFansButTooManyFollowing) {
+            matchingKeywords.add("0 Fans but too many following with default profile image")
+            return true
+        }
+    }
+    return false
 }
 
 suspend fun blocker(
@@ -208,9 +205,9 @@ suspend fun blocker(
     if (usersToBlock.isNotEmpty()) {
         println("Users to block:")
         usersToBlock.forEach { (id, details) ->
-            val (screenName, name) = details
+            val (screenName, name, reason) = details
             val profileUrl = "https://twitter.com/$screenName"
-            println("ID: $id, Screen Name: $screenName, Name: $name, Profile URL: $profileUrl ")
+            println("ID: $id, Screen Name: $screenName, Name: $name, Profile URL: $profileUrl , Reason: $reason")
         }
         println("${RED_TEXT}You should manually review each user pending block to prevent mistakes. ${RESET_TEXT}")
     } else {

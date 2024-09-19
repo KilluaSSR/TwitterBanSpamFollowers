@@ -59,12 +59,14 @@ fun loadIdsFromFile(): List<Long> {
     }
 }
 
-fun saveUsersToBlock(id: Long, screenName: String, name: String) {
+fun saveUsersToBlock(id: Long, screenName: String, name: String, reason: BlockCheckResult) {
     // Create a JSON object with the user details
     val jsonObject = JsonObject().apply {
         addProperty("id", id)
         addProperty("screenName", screenName)
         addProperty("name", name)
+        addProperty("keywords", reason.matchingKeywords.toString())
+        addProperty("reasonList", reason.reasonList.toString())
     }
 
     // Convert the JSON object to a JSON string
@@ -93,9 +95,11 @@ fun loadUserIdsToBlock(): Map<Long, Array<String>> {
             val id = jsonObject.get("id")?.asLong
             val screenName = jsonObject.get("screenName")?.asString
             val name = jsonObject.get("name")?.asString
+            val keywords = jsonObject.get("keywords")?.asString
+            val reasonList = jsonObject.get("reasonList")?.asJsonArray
             // Add the user details to the map
             if (id != null && screenName != null && name != null) {
-                userMap[id] = arrayOf(screenName, name)
+                userMap[id] = arrayOf(screenName, name,keywords.toString(),reasonList.toString())
             }
         } catch (e: Exception) {
             println("Error reading line: $line, ${e.message}")
@@ -124,6 +128,8 @@ fun refreshUsersToBlockFile(users: Map<Long, Array<String>>) {
                 addProperty("id", id)
                 addProperty("screenName", details[0])
                 addProperty("name", details[1])
+                addProperty("keywords", details[2])
+                addProperty("reasonList", details[3])
             }
             val jsonString = Gson().toJson(jsonObject)
             writer.write("$jsonString\n")

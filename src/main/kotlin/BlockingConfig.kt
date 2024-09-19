@@ -10,7 +10,7 @@ data class BlockingConfig(
     val excludeKeywords: List<String>,
 )
 
-data class BlockCheckResult(val shouldBlock: Boolean, val matchingKeywords: List<String>)
+data class BlockCheckResult(val shouldBlock: Boolean, val matchingKeywords: List<String>, var reasonList: List<String>)
 
 fun loadBlockingConfig() {
     if (configFile.exists()) {

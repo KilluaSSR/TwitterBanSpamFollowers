@@ -58,8 +58,8 @@ class RunCommand : CliktCommand(
     private val delay by option(metavar = "INT")
         .help(
             "Delay between fetching two users must be specified in milliseconds. A high delay can significantly extend the processing time, " +
-                "but it will make the process more stable. Note that 1 second equals 1000 milliseconds. " +
-                "The default value is 100 milliseconds, and it must be greater than 80 milliseconds."
+                    "but it will make the process more stable. Note that 1 second equals 1000 milliseconds. " +
+                    "The default value is 100 milliseconds, and it must be greater than 80 milliseconds."
         )
     private val ratio by option(metavar = "INT")
         .help("Block users with a followings-to-followers ratio higher than the specified value")
@@ -68,7 +68,8 @@ class RunCommand : CliktCommand(
         val exceptionHandler = CoroutineExceptionHandler { _, exception ->
             println("Caught $exception")
         }
-
+        val cachedIds = loadIdsFromFile().toMutableSet()
+        val idsToRemove = mutableListOf<Long>()
         supervisorScope {
             try {
                 val (token, secret) = if (accessToken == null || accessSecret == null) {
@@ -133,9 +134,9 @@ class RunCommand : CliktCommand(
                         saveIdsToFile(ids.iDs.toList())
 
                         rateLimitStatus.sleepIfNeeded(callCount = 2)
-                        val cachedIds = loadIdsFromFile().toMutableSet()
 
-                        val idsToRemove = mutableListOf<Long>()
+
+
                         processCachedIds(
                             cachedIds,
                             idsToRemove,
@@ -146,8 +147,6 @@ class RunCommand : CliktCommand(
                             usersToBlock,
                             delayTime
                         )
-                        cachedIds.removeAll(idsToRemove.toSet())
-                        refreshFileWithCachedIds(idsFile, cachedIds)
                     }
 
                     if (usersToBlock.isNotEmpty()) {
@@ -155,12 +154,6 @@ class RunCommand : CliktCommand(
                             println("Warning: The previous steps did not complete successfully. Proceeding to block users... Wait 10 seconds.")
                         }
                         println("\nUsers to be blocked:")
-                        usersToBlock.forEach { (id, details) ->
-                            val (screenName, name) = details
-                            println("Username: $screenName")
-                            println("User ID: $id")
-                            println("Profile URL: https://twitter.com/$name\n")
-                        }
                         if (cursor != 0L) {
                             println("Wait 10 seconds.")
                         }
@@ -176,7 +169,16 @@ class RunCommand : CliktCommand(
                     }
                 }
             } catch (e: TwitterException) {
-                handleTwitterException(e)
+                when(e){
+//                    e.rateLimitStatus ->{
+//                        //refresh(cachedIds,idsToRemove)
+//                        throw Exception("Run it later!")
+//                    }
+                    else->{
+                        handleTwitterException(e)
+                    }
+                }
+
             } catch (e: SSLHandshakeException) {
                 println("SSL Handshake failed, retrying in 5 seconds...")
                 delay(5000)
@@ -218,19 +220,22 @@ class RunCommand : CliktCommand(
                     val keywords = result.matchingKeywords.joinToString(", ")
                     println("ID:${user.screenName}, Username:${user.name}, $id: ${RED_TEXT}matches criteria: $keywords${RESET_TEXT}")
                     usersToBlock[user.id] = arrayOf(user.name, user.screenName)
-                    idsToRemove.add(id)
-                    saveUsersToBlock(user.id, user.name, user.screenName)
+                    saveUsersToBlock(user.id, user.name, user.screenName,result)
                 } else {
                     println("ID:${user.screenName}, Username:${user.name}, $id: does not match criteria.")
                 }
+                idsToRemove.add(id)
             } catch (e: Exception) {
                 // 如果遇到错误，不退出，继续处理下一个ID
                 delay(10000)
                 continue
             }
         }
-
-        cachedIds.removeAll(idsToRemove.toSet())
-        refreshFileWithCachedIds(idsFile, cachedIds)
+        //refresh(cachedIds, idsToRemove)
     }
+
+//    private fun refresh(cachedIds: MutableSet<Long>, idsToRemove: MutableList<Long>) {
+//        cachedIds.removeAll(idsToRemove.toSet())
+//        refreshFileWithCachedIds(idsFile, cachedIds)
+//    }
 }

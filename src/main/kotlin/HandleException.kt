@@ -2,12 +2,14 @@ package killua.dev
 
 import kotlinx.coroutines.delay
 import twitter4j.TwitterException
+import java.io.File
 
 suspend fun handleTwitterException(e: TwitterException) {
     when {
         e.exceededRateLimitation() -> {
             rateLimitStatus = RateLimit.FiveMinutes
             println("${RED_TEXT}Failed: Exceeded Rate Limitation.${RESET_TEXT}")
+
         }
 
         e.statusCode == 503 -> {
