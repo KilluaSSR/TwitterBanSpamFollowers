@@ -22,6 +22,7 @@ dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
     implementation("org.twitter4j:twitter4j-core:4.1.2")
     implementation("com.github.scribejava:scribejava-apis:8.3.3")
+    implementation("io.github.redouane59.twitter:twittered:2.23")
     testImplementation(kotlin("test"))
 
 }

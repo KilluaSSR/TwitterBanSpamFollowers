@@ -108,55 +108,26 @@ class RunCommand : CliktCommand(
                     val twitter = initializeTwitterClient(token, secret) ?: return@launch
                     val twitterV1 = twitter.v1()
                     val users = twitterV1.users()
-                    val friendsFollowers = twitterV1.friendsFollowers()
-
                     if (dryRun) {
                         println("DRY RUN\n")
                     }
-
-                    var cursor = -1L
                     val usersToBlock = loadUserIdsToBlock().toMutableMap()
                     loadBlockingConfig()
-
-                    while (cursor != 0L) {
-                        rateLimitStatus.sleepIfNeeded()
-                        print("Fetching followers")
-
-                        val ids = withRetry {
-                            friendsFollowers.getFollowersIDs(cursor)
-                        } ?: break // Exit loop if failed after retries
-
-                        cursor = ids.nextCursor
-                        rateLimitStatus = ids.rateLimitStatus ?: RateLimit.Unlimited
-                        println("Done. (count=${ids.iDs.size}, hasMore=${cursor != 0L})\n")
-
-                        saveIdsToFile(ids.iDs.toList())
-
-                        rateLimitStatus.sleepIfNeeded(callCount = 2)
-
-
-
-                        processCachedIds(
-                            cachedIds,
-                            idsToRemove,
-                            users,
-                            registerConverted,
-                            spamConverted,
-                            ratioConverted,
-                            usersToBlock,
-                            delayTime
-                        )
-                    }
-
+                    val myFollowers = getMyFollowers(twitterV1)
+                    saveIdsToFile(myFollowers.toList())
+                    cachedIds += myFollowers.toSet()
+                    processCachedIds(
+                        cachedIds,
+                        idsToRemove,
+                        users,
+                        registerConverted,
+                        spamConverted,
+                        ratioConverted,
+                        usersToBlock,
+                        delayTime
+                    )
                     if (usersToBlock.isNotEmpty()) {
-                        if (cursor != 0L) {
-                            println("Warning: The previous steps did not complete successfully. Proceeding to block users... Wait 10 seconds.")
-                        }
-                        println("\nUsers to be blocked:")
-                        if (cursor != 0L) {
-                            println("Wait 10 seconds.")
-                        }
-                        delay(10000)
+                        delay(3000)
                         blocker(usersToBlock, users, dryRun)
                     } else {
                         println("No users match the criteria for blocking.")
@@ -169,10 +140,6 @@ class RunCommand : CliktCommand(
                 }
             } catch (e: TwitterException) {
                 when(e){
-//                    e.rateLimitStatus ->{
-//                        //refresh(cachedIds,idsToRemove)
-//                        throw Exception("Run it later!")
-//                    }
                     else->{
                         handleTwitterException(e)
                     }
@@ -230,11 +197,6 @@ class RunCommand : CliktCommand(
                 continue
             }
         }
-        //refresh(cachedIds, idsToRemove)
     }
 
-//    private fun refresh(cachedIds: MutableSet<Long>, idsToRemove: MutableList<Long>) {
-//        cachedIds.removeAll(idsToRemove.toSet())
-//        refreshFileWithCachedIds(idsFile, cachedIds)
-//    }
 }

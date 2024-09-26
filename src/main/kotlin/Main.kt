@@ -2,19 +2,24 @@ package killua.dev
 
 import com.github.ajalt.clikt.core.NoOpCliktCommand
 import com.github.ajalt.clikt.core.subcommands
+import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
+import twitter4j.TwitterException
 import java.io.InputStream
 import java.util.*
+
 
 const val apiKey = "3rJOl1ODzm9yZy63FACdg"
 const val apiSecret = "5jPoQ5kQvMJFDYRNE8bQ4rHuds4xJqhvgNJM4awaE8"
 lateinit var internalKeywords: Set<String>
 
-fun main(vararg args: String) {
-    // 初始化时加载资源文件
+suspend fun main(vararg args: String) {
+     //初始化时加载资源文件
     initialize("sensitive_word_dict.txt")
     NoOpCliktCommand(name = "<FileName.jar>")
         .apply {
-            subcommands(AuthCommand(), RunCommand(), Execute())
+            subcommands(AuthCommand(), RunCommand(), Execute(), KillAll())
         }
         .main(args)
 }

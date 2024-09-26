@@ -22,8 +22,8 @@ suspend fun handleTwitterException(e: TwitterException) {
         }
 
         e.statusCode == -1 -> {
-            println("${RED_TEXT}Service error, wait 30 seconds.${RESET_TEXT}")
-            delay(30 * 1000)
+            println("${RED_TEXT}Service error, wait 10 secs.${RESET_TEXT}")
+            delay(10 * 1000)
         }
 
         e.statusCode == 403 -> {
