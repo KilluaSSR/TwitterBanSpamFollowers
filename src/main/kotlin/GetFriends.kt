@@ -20,19 +20,24 @@ suspend fun getUserIDs(
             when (relationshipType) {
                 RelationshipType.Followers -> {
                     if (userID != null) {
+                        println("Getting his/her followers.")
                         friendsFollowers.getFollowersIDs(userID, cursor)
                     } else {
+                        println("Getting my followers.")
                         friendsFollowers.getFollowersIDs(cursor)
                     }
                 }
                 RelationshipType.Following -> {
                     if (userID != null) {
+                        println("Getting his/her followings.")
                         friendsFollowers.getFriendsIDs(userID, cursor)
                     } else {
+                        println("Getting my followings.")
                         friendsFollowers.getFriendsIDs(cursor)
                     }
                 }
                 RelationshipType.Blocked -> {
+                    println("Getting my blocked ids.")
                     twitterV1.users().getBlocksIDs(cursor)
                 }
             }

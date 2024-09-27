@@ -100,10 +100,7 @@ class RunCommand : CliktCommand(
                 if (delayConverted != null && delayConverted < 80) {
                     throw Exception("Delay must be grater than 80.")
                 }
-
                 val delayTime = delayConverted ?: 100
-
-
                 launch(exceptionHandler) {
                     val twitter = initializeTwitterClient(token, secret) ?: return@launch
                     val twitterV1 = twitter.v1()
