@@ -11,7 +11,8 @@ import java.util.*
 
 val usersToBlockFile = File("users_to_block.json")
 val configFile = File("blocking_rules.json")
-val idsFile = File("ids_cache.txt")
+val followersIdsFile = File("followers_ids_cache.txt")
+val followingsIdsFile = File("followings_ids_cache.txt")
 val credentialFile = File("twitter_credentials.properties")
 
 fun readCredentialsFromFile(): Pair<String, String>? {
@@ -44,21 +45,34 @@ fun deleteCredentialsFile() {
     }
 }
 
-fun saveIdsToFile(ids: List<Long>) {
-    idsFile.writeText("")
-    PrintWriter(idsFile).use { writer ->
+fun saveFollowersIdsToFile(ids: List<Long>) {
+    followersIdsFile.writeText("")
+    PrintWriter(followersIdsFile).use { writer ->
         ids.forEach { writer.println(it) }
     }
 }
 
-fun loadIdsFromFile(): List<Long> {
-    return if (idsFile.exists()) {
-        idsFile.readLines().mapNotNull { it.toLongOrNull() }
+fun saveFollowingsIdsToFile(ids: List<Long>) {
+    followingsIdsFile.writeText("")
+    PrintWriter(followingsIdsFile).use { writer ->
+        ids.forEach { writer.println(it) }
+    }
+}
+fun loadFollowersIdsFromFile(): List<Long> {
+    return if (followersIdsFile.exists()) {
+        followersIdsFile.readLines().mapNotNull { it.toLongOrNull() }
     } else {
         emptyList()
     }
 }
 
+fun loadFollowingsIdsFromFile(): List<Long> {
+    return if (followingsIdsFile.exists()) {
+        followingsIdsFile.readLines().mapNotNull { it.toLongOrNull() }
+    } else {
+        emptyList()
+    }
+}
 fun saveUsersToBlock(id: Long, screenName: String, name: String, reason: BlockCheckResult) {
     // Create a JSON object with the user details
     val jsonObject = JsonObject().apply {

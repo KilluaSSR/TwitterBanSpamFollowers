@@ -67,7 +67,6 @@ class RunCommand : CliktCommand(
         val exceptionHandler = CoroutineExceptionHandler { _, exception ->
             println("Caught $exception")
         }
-        val cachedIds = loadIdsFromFile().toMutableSet()
         val idsToRemove = mutableListOf<Long>()
         supervisorScope {
             try {
@@ -111,10 +110,9 @@ class RunCommand : CliktCommand(
                     val usersToBlock = loadUserIdsToBlock().toMutableMap()
                     loadBlockingConfig()
                     val myFollowers = getMyFollowers(twitterV1)
-                    saveIdsToFile(myFollowers.toList())
-                    cachedIds += myFollowers.toSet()
+                    saveFollowersIdsToFile(myFollowers.toList())
                     processCachedIds(
-                        cachedIds,
+                        myFollowers.toMutableSet(),
                         idsToRemove,
                         users,
                         registerConverted,

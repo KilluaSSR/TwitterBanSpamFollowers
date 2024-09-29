@@ -17,7 +17,7 @@ class KillAll : CliktCommand(
     private val accessSecret by option(metavar = "KEY").help("OAuth access token secret")
     private val sinner by option(help = "Whom shall you judge among the sinners? Tell my his/her username AFTER @").required()
     private val following by option(help = "followings").flag()
-    private val followers by option(help = "followers").flag()
+    private val follower by option(help = "followers").flag()
     override fun run(): Unit = runBlocking {
         if (sinner.isBlank()) {
             throw CliktError("You need to specify who you are going to kill.")
@@ -44,15 +44,28 @@ class KillAll : CliktCommand(
                     if (!input.equals("ok", ignoreCase = true)) {
                         throw CliktError("Bye!")
                     }
-                    val followings = getMyFollowings(twitterV1)
-                    val followers = getMyFollowers(twitterV1)
-                    val protected = followers + followings
-                    val sinFollowings = getOthersFollowings(twitterV1,sinUserID)
-                    val sinFollowers = getOthersFollowers(twitterV1,sinUserID)
+                    val myFollowings = if(followingsIdsFile.exists() && followingsIdsFile.length() > 0) {
+                        loadFollowingsIdsFromFile()} else getMyFollowings(twitterV1)
+                    val myFollowers = if(followersIdsFile.exists() && followersIdsFile.length() > 0) {
+                        loadFollowersIdsFromFile() } else getMyFollowers(twitterV1)
+                    val protected = myFollowers + myFollowings
+                    var sinFollowings: Set<Long>
+                    var sinFollowers: Set<Long>
                     val myBlock = getMyBlocked(twitterV1)
-                    val toBlock = sinFollowings - protected - myBlock
-                    val percent = (sinFollowings - (sinFollowings - myBlock)).size.toLong() / sinFollowings.size.toLong().toDouble() * 100
-                    println("You've already blocked ${String.format("%.2f", percent)}% sinners, ${(sinFollowings - (sinFollowings - myBlock)).size} out of ${sinFollowings.size} ")
+                    var toBlock = emptySet<Long>()
+                    if((following && follower) || (!following && !follower)) {
+                        sinFollowings = getOthersFollowings(twitterV1,sinUserID)
+                        sinFollowers = getOthersFollowers(twitterV1,sinUserID)
+                        toBlock = sinFollowings + sinFollowers - protected - myBlock
+                    }else if(!following && follower) {
+                        sinFollowers = getOthersFollowers(twitterV1,sinUserID)
+                        toBlock = sinFollowers - protected - myBlock
+                    }else if(following && !follower) {
+                        sinFollowings = getOthersFollowings(twitterV1,sinUserID)
+                        toBlock = sinFollowings - protected - myBlock
+                    }
+                    saveFollowersIdsToFile(myFollowers.toList())
+                    saveFollowingsIdsToFile(myFollowings.toList())
                     println("${toBlock.size} sinners are waiting to die, waiting to live. Waiting for an absolution, that would never come.")
                     var i = 1
                     for (id in toBlock) {
